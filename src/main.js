@@ -10,7 +10,7 @@ import ItemDetailView from "./views/ItemDetailView.js";
 // cambiar aquí el path a algo como "/receta/:id" — solo asegúrate de
 // que coincida con los enlaces generados en ItemCard.js.
 const routes = [
-  { path: "/index.html", view: HomeView }, // Para que funcione al abrir el index.html directamente, porque sin eso siempre se muestra la vista de not found al abrir el archivo en live server.
+  { path: "/index.html", view: AboutView }, // Para que funcione al abrir el index.html directamente, porque sin eso siempre se muestra la vista de not found al abrir el archivo en live server.
   { path: "/", view: HomeView },
   { path: "/acerca", view: AboutView },
   { path: "/item/:id", view: ItemDetailView },
