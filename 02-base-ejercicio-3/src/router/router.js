@@ -37,9 +37,40 @@ export default class Router {
    *   matchRoute("/item/2") -> { route: <ruta /item/:id>, params: { id: "2" } }
    */
   matchRoute(path) {
-    const route = this.routes.find((r) => r.path === path);
-    if (!route) return null;
-    return { route, params: {} };
+    for (const route of this.routes) {
+      if (route.path === path) {
+        return { route, params: {} };
+      }
+
+      const routeSegments = route.path.split("/");
+      const pathSegments = path.split("/");
+
+      if (routeSegments.length !== pathSegments.length) {
+        continue;
+      }
+
+      let isMatch = true;
+      const params = {};
+
+      for (let i = 0; i < routeSegments.length; i++) {
+        const routeSeg = routeSegments[i];
+        const pathSeg = pathSegments[i];
+
+        if (routeSeg.startsWith(":")) {
+          const paramName = routeSeg.slice(1);
+          params[paramName] = decodeURIComponent(pathSeg);
+        } else if (routeSeg !== pathSeg) {
+          isMatch = false;
+          break;
+        }
+      }
+
+      if (isMatch) {
+        return { route, params };
+      }
+    }
+
+    return null;
   }
 
   async render() {
