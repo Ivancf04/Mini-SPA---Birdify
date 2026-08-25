@@ -87,7 +87,7 @@ export default class Router {
 
     const html = await match.route.view(match.params);
     this.root.innerHTML = html;
-    document.title = `Mi Catálogo — ${path}`;
+    document.title = `Birdify — ${path === "/" ? "Inicio" : path}`;
   }
 
   init() {

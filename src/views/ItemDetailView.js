@@ -17,11 +17,26 @@
 // se llaman en pantalla, según tu tema.
 
 export default async function ItemDetailView(params) {
-  // Implementación pendiente.
+  const { default: ItemsService } = await import("../services/itemsService.js");
+  const service = new ItemsService();
+  const item = await service.getById(params?.id);
+
+  if (!item) {
+    return `
+      <div class="card">
+        <h2>Elemento no encontrado</h2>
+        <p>El elemento con ID "${params?.id ?? ""}" no existe en el catálogo.</p>
+        <a href="/" data-link>← Volver al inicio</a>
+      </div>
+    `;
+  }
+
   return `
     <div class="card">
-      <h2>Detalle de elemento (pendiente de implementar)</h2>
-      <p>id recibido: ${params?.id ?? "sin definir"}</p>
+      <h2>${item.title}</h2>
+      <p>${item.description}</p>
+      <p><small>${item.meta}</small></p>
+      <a href="/" data-link>← Volver al inicio</a>
     </div>
   `;
 }

@@ -15,6 +15,15 @@
 //   import { slugify } from "../utils/slugify.js";
 
 export function slugify(text) {
-  // Implementación pendiente: por ahora solo devuelve el texto tal cual.
-  return text;
+  if (!text) return "";
+  return text
+    .toString()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-");
 }
+//Esto esta funcionando bien.
