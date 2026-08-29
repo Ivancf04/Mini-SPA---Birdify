@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Birdify — Catálogo de Aves</title>
+
+  <!--
+    Separación App Shell / Contenido:
+    hell.css que estilos estructurales permanentes como header, nav, footer y #app
+    home.css que son estilos específicos de la vista Inicio osea el grid de tarjetas
+    detail.css son estilos específicos de la vista de detalle
+  -->
+  <link rel="stylesheet" href="styles/shell.css" />
+  <link rel="stylesheet" href="styles/home.css" />
+  <link rel="stylesheet" href="styles/detail.css" />
+</head>
+<body>
+
+  <!-- app shell que se mantiene en toda la vida de la SPA nunca se reemplaza -->
+  <header>
+    <h1>Birdify</h1>
+    <nav>
+      <a href="/" data-link>Inicio</a>
+      <a href="/acerca" data-link>Nosotros</a>
+    </nav>
+  </header>
+
+  <!--
+    contendor raiz única zona que el router modifica.
+    El skeleton es visible mientras el router resuelve la vista
+    el router lo reemplaza con el HTML real de la vista
+  -->
+  <main id="app">
+    <!-- Skeleton loader: estado de carga inicial -->
+    <div class="skeleton-loader" aria-label="Cargando contenido…" role="status">
+      <div class="skeleton-block title"></div>
+      <div class="skeleton-block card"></div>
+      <div class="skeleton-block card"></div>
+      <div class="skeleton-block card"></div>
+    </div>
+  </main>
+
+  <!--footer se mantiene en toda la vida de la SPA nunca se reemplaza -->
+  <footer>
+    <p>Todos los derechos reservados — Birdify</p>
+  </footer>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

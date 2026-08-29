@@ -1,0 +1,97 @@
+/* ==========================================================
+   grid tarjetas con 2 breakpoints
+     celular 1 columna
+     tablet 2 columnas
+     desktop 3 columnas
+   ========================================================== */
+
+/* Encabezado de secc */
+.view-home h2 {
+  font-size: 1.25rem;
+  margin-block: 0 0.75rem;
+  color: #1e2761;
+}
+
+.view-home .subtitle {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin-block: 0 1.25rem;
+}
+
+/* grid de tarjeta base celular 1 columna */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;   /* 1 col en celular */
+  gap: 1rem;
+}
+
+/* tarjeta */
+.card {
+  background: white;
+  border-radius: 0.625rem;      /* rem en lugar de px*/
+  padding: 1.25rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.card h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1e2761;
+}
+
+.card p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.card small {
+  font-size: 0.75rem;
+  color: #6b7280;
+}
+
+.card a {
+  color: #1e2761;
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+  margin-top: auto;    /* empuja el enlace al fondo */
+  align-self: flex-start;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+
+.card a:hover {
+  border-bottom-color: #1e2761;
+}
+
+/* breakpoint tablet  600px */
+@media (min-width: 37.5rem) {   /* 600px */
+  .view-home h2 {
+    font-size: 1.5rem;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, 1fr);  /* 2 cols en tablet */
+  }
+}
+
+/* breakpoint desktop 900px*/
+@media (min-width: 56.25rem) {  /* 900px */
+  .view-home h2 {
+    font-size: 1.75rem;
+  }
+
+  .grid {
+    grid-template-columns: repeat(3, 1fr);  /* 3 cols en desktop */
+    gap: 1.5rem;
+  }
+
+  .card {
+    padding: 1.5rem;
+  }
+}

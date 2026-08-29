@@ -1,0 +1,142 @@
+/* ── reset y base ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 100%; /* 1rem*/
+}
+
+body {
+  font-family: system-ui, sans-serif;
+  margin: 0;
+  color: #1e2761;
+  background: #f7f8fb;
+  line-height: 1.5;
+}
+
+/* header cel base */
+header {
+  background: #1e2761;
+  color: white;
+  /* Móvil: padding más pequeño, columna apilada */
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+header h1 {
+  margin: 0;
+  font-size: 1.5rem;  
+  letter-spacing: 0.02em;
+}
+
+/* Nav cel base */
+nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+}
+
+nav a {
+  color: #cadcfc;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 0.9rem;
+  padding: 0.25rem 0;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+
+nav a:hover,
+nav a[aria-current="page"] {
+  border-bottom-color: #cadcfc;
+}
+
+/* contenedor raiz celular base*/
+#app {
+  padding: 1rem;       /* rem de espaciado relativo */
+  min-height: 50vh;
+}
+
+/* footer (celular base */
+footer {
+  text-align: center;
+  padding: 1rem;
+  color: #6b7280;
+  font-size: 0.8rem;
+  border-top: 1px solid #e5e7eb;
+  margin-top: 2rem;
+}
+
+/* skeleton loader */
+/* visible mientras el router resuelve la vista */
+.skeleton-loader {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.skeleton-block {
+  background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s infinite;
+  border-radius: 0.5rem;
+}
+
+.skeleton-block.title {
+  height: 1.75rem;
+  width: 50%;
+}
+
+.skeleton-block.card {
+  height: 6rem;
+  width: 100%;
+}
+
+@keyframes skeleton-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* breakpoint: tablet*/
+@media (min-width: 37.5rem) {   /* 600px */
+  header {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 1rem 1.5rem;
+  }
+
+  header h1 {
+    font-size: 1.75rem;
+  }
+
+  nav a {
+    font-size: 0.95rem;
+  }
+
+  #app {
+    padding: 1.5rem;
+  }
+}
+
+/* breakpoint: desktop 900px */
+@media (min-width: 56.25rem) {  /* 900px */
+  header {
+    padding: 1rem 2.5rem;
+  }
+
+  header h1 {
+    font-size: 2rem;
+  }
+
+  #app {
+    padding: 2rem 2.5rem;
+    max-width: 72rem;   
+    margin-inline: auto;
+  }
+}
