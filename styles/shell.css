@@ -17,14 +17,15 @@ body {
 
 /* header cel base */
 header {
-  background: #1e2761;
-  color: white;
+  background: #018547;
+  color: rgb(255, 255, 255);
   /* Móvil: padding más pequeño, columna apilada */
   padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
   gap: 0.5rem;
+  box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
 }
 
 header h1 {
@@ -41,7 +42,7 @@ nav {
 }
 
 nav a {
-  color: #cadcfc;
+  color: #ffffff;
   text-decoration: none;
   font-weight: 600;
   font-size: 0.9rem;
@@ -65,7 +66,7 @@ nav a[aria-current="page"] {
 footer {
   text-align: center;
   padding: 1rem;
-  color: #6b7280;
+  color: #018547;
   font-size: 0.8rem;
   border-top: 1px solid #e5e7eb;
   margin-top: 2rem;
