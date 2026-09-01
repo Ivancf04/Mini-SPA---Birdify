@@ -1,41 +1,58 @@
-// TODO (Ejercicio - Parte A, punto 2): completa esta vista.
-//
-// Esta función recibirá el objeto "params" que tu Router extraiga de la
-// URL, por ejemplo params = { id: "2" } para la ruta "/item/2".
-//
-// Pasos sugeridos:
-//   1. Dentro de esta función (NO como import estático arriba del
-//      archivo), haz: const { default: ItemsService } = await
-//      import("../services/itemsService.js");
-//   2. Crea una instancia: const service = new ItemsService();
-//   3. Usa service.getById(params.id) para obtener el elemento.
-//   4. Si no existe, devuelve un HTML simple indicando "no encontrado".
-//   5. Si existe, devuelve un <div class="card"> con sus campos
-//      (título, descripción, meta...).
-//
-// TODO: una vez que funcione, ajusta qué campos mostrar y cómo
-// se llaman en pantalla, según tu tema.
-
 export default async function ItemDetailView(params) {
-  const { default: ItemsService } = await import("../services/itemsService.js");
-  const service = new ItemsService();
-  const item = await service.getById(params?.id);
+  // Import dinámico del servicio ApiService
+  const { default: ApiService } = await import("../services/apiService.js");
+  const service = new ApiService();
 
-  if (!item) {
+  let item = null;
+  let error = null;
+
+  // Estado de carga (Loading): Es manejado por el Router mediante el skeleton loader
+  // Estado de error y éxito: gestionados con try/catch y async/await
+  try {
+    item = await service.getBirdById(params?.id);
+  } catch (err) {
+    error = err.message;
+  }
+
+  // Estado de Error
+  if (error) {
     return `
-      <div class="card-detail">
-        <h2>Elemento no encontrado</h2>
-        <p>El elemento con ID "${params?.id ?? ""}" no existe en el catálogo.</p>
+      <div class="card-detail error-card" role="alert">
+        <h2>Error al obtener la información</h2>
+        <p>${error}</p>
         <a href="/" data-link class="back-link">← Volver al inicio</a>
       </div>
     `;
   }
 
+  // Elemento no encontrado
+  if (!item) {
+    return `
+      <div class="card-detail">
+        <h2>Ave no encontrada</h2>
+        <p>No se encontró ninguna especie con el ID "${params?.id ?? ""}".</p>
+        <a href="/" data-link class="back-link">← Volver al inicio</a>
+      </div>
+    `;
+  }
+
+  // Estado de Éxito
+  const photoHtml = item.photo
+    ? `<img src="${item.photo}" alt="${item.title}" class="detail-img" />`
+    : "";
+
   return `
     <div class="card-detail">
+      ${photoHtml}
       <h2>${item.title}</h2>
+      <p class="scientific-name"><em>${item.scientificName}</em></p>
       <p>${item.description}</p>
       <small>${item.meta}</small>
+      ${
+        item.wikipediaUrl
+          ? `<p><a href="${item.wikipediaUrl}" target="_blank" rel="noopener noreferrer" class="external-link">Ver más detalles en Wikipedia ↗</a></p>`
+          : ""
+      }
       <a href="/" data-link class="back-link">← Volver al inicio</a>
     </div>
   `;
