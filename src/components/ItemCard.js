@@ -1,6 +1,5 @@
 import { slugify } from "../utils/slugify.js";
 
-// Recibe un objeto "item" y devuelve el HTML de su tarjeta en el listado.
 export default function ItemCard(item) {
   const slug = slugify(item.title);
   const photoHtml = item.photo
@@ -8,7 +7,7 @@ export default function ItemCard(item) {
     : "";
 
   return `
-    <article class="card" data-slug="${slug}">
+    <article class="card" data-slug="${slug}" data-title="${item.title.toLowerCase()}">
       ${photoHtml}
       <div class="card-body">
         <h3>${item.title}</h3>

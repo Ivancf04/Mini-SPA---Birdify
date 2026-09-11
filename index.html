@@ -14,6 +14,8 @@
   <link rel="stylesheet" href="styles/shell.css" />
   <link rel="stylesheet" href="styles/home.css" />
   <link rel="stylesheet" href="styles/detail.css" />
+  <link rel="stylesheet" href="styles/theme.css" />
+  <link rel="stylesheet" href="styles/diagnostic.css" />
 </head>
 <body>
 
@@ -23,6 +25,8 @@
     <nav>
       <a href="/" data-link>Inicio</a>
       <a href="/acerca" data-link>Nosotros</a>
+      <a href="/diagnostico" data-link>Diagnóstico</a>
+      <button id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">🌙</button>
     </nav>
   </header>
 
@@ -32,7 +36,6 @@
     el router lo reemplaza con el HTML real de la vista
   -->
   <main id="app">
-    <!-- Skeleton loader: estado de carga inicial -->
     <div class="skeleton-loader" aria-label="Cargando contenido…" role="status">
       <div class="skeleton-block title"></div>
       <div class="skeleton-block card"></div>

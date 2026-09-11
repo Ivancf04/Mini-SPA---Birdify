@@ -1,5 +1,3 @@
-// TODO: Reemplaza este texto por una breve descripción de tu
-// propio tema/proyecto.
 export default function AboutView() {
   return `
     <div class="card">

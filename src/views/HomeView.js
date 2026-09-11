@@ -1,5 +1,6 @@
 import ApiService from "../services/apiService.js";
 import ItemCard from "../components/ItemCard.js";
+import { KEYS, getSession } from "../utils/storage.js";
 
 export default async function HomeView() {
   const service = new ApiService();
@@ -72,12 +73,26 @@ export default async function HomeView() {
   }
 
   // si todo salio bien genera las tarjetas
+  const savedSearch = getSession(KEYS.HOME_SEARCH, "");
+  const filteredItems = savedSearch
+    ? items.filter((item) => item.title.toLowerCase().includes(savedSearch.toLowerCase()))
+    : items;
+
   return `
     <section class="view-home">
       <h2>Aves Registradas (API iNaturalist)</h2>
       <p class="subtitle">Catalogo generado en tiempo real mediante consumo de API REST</p>
+      <input
+        type="search"
+        id="home-search"
+        class="search-input"
+        placeholder="Buscar ave por nombre…"
+        value="${savedSearch}"
+      />
       <div class="grid">
-        ${items.map((item) => ItemCard(item)).join("")}
+        ${filteredItems.length
+          ? filteredItems.map((item) => ItemCard(item)).join("")
+          : '<p class="no-results">No se encontraron aves con ese nombre.</p>'}
       </div>
     </section>
   `;
