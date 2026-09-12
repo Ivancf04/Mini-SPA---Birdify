@@ -7,6 +7,7 @@ import { KEYS, getLocal, setLocal, removeLocal, getCookie, setCookie, deleteCook
 
 const routes = [
   { path: "/index.html", view: HomeView }, // Para funcionamiento directo en Live Server
+  { path: "/Mini-SPA---Birdify/", view: HomeView },
   { path: "/", view: HomeView },
   { path: "/acerca", view: AboutView },
   { path: "/diagnostico", view: DiagnosticView },
