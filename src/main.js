@@ -6,11 +6,11 @@ import DiagnosticView from "./views/DiagnosticView.js";
 import { KEYS, getLocal, setLocal, removeLocal, getCookie, setCookie, deleteCookie, setSession, removeSession } from "./utils/storage.js";
 
 const routes = [
-  { path: "/index.html", view: HomeView }, // Para funcionamiento directo en Live Server
-  { path: "/", view: HomeView },
-  { path: "/acerca", view: AboutView },
-  { path: "/diagnostico", view: DiagnosticView },
-  { path: "/item/:id", view: ItemDetailView },
+  { path: "/Mini-SPA---Birdify/index.html", view: HomeView }, // Para funcionamiento directo en Live Server
+  { path: "/Mini-SPA---Birdify/", view: HomeView },
+  { path: "/Mini-SPA---Birdify/acerca", view: AboutView },
+  { path: "/Mini-SPA---Birdify/diagnostico", view: DiagnosticView },
+  { path: "/Mini-SPA---Birdify/item/:id", view: ItemDetailView },
 ];
 
 const app = document.getElementById("app");
