@@ -37,6 +37,16 @@ export default class Router {
    *   matchRoute("/item/2") -> { route: <ruta /item/:id>, params: { id: "2" } }
    */
   matchRoute(path) {
+    // 1. Intento directo con el path exacto
+    const directMatch = this._findMatch(path);
+    if (directMatch) return directMatch;
+
+    // 2. Soporte para GitHub Pages en subdirectorios (ej. /Mini-SPA---Birdify/avistamientos)
+    const strippedPath = path.replace(/^\/[^/]+/, "") || "/";
+    return this._findMatch(strippedPath);
+  }
+
+  _findMatch(path) {
     for (const route of this.routes) {
       if (route.path === path) {
         return { route, params: {} };

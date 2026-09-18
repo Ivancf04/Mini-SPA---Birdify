@@ -22,6 +22,7 @@
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  border: 1px solid #f1f5f9af;
 }
 
 [data-theme="dark"] .sightings-form-card,
@@ -155,3 +156,123 @@
   color: #991b1b;
   border: 1px solid #fca5a5;
 }
+
+/* Modal de Confirmación */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 1rem;
+  animation: fadeIn 0.2s ease-out;
+}
+
+.modal-card {
+  background: #ffffff;
+  color: #1e293b;
+  border-radius: 12px;
+  padding: 2rem;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  text-align: center;
+  animation: slideUp 0.25s ease-out;
+}
+
+[data-theme="dark"] .modal-card {
+  background: #1e293b;
+  color: #f8fafc;
+  border: 1px solid #334155;
+}
+
+.modal-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.modal-card h3 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.modal-card p {
+  color: #64748b;
+  font-size: 0.95rem;
+  margin: 0 0 1.5rem 0;
+  line-height: 1.5;
+}
+
+[data-theme="dark"] .modal-card p {
+  color: #94a3b8;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.btn-modal-cancel {
+  background: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-modal-cancel:hover {
+  background: #e2e8f0;
+  color: #1e293b;
+}
+
+[data-theme="dark"] .btn-modal-cancel {
+  background: #334155;
+  color: #cbd5e1;
+  border-color: #475569;
+}
+
+[data-theme="dark"] .btn-modal-cancel:hover {
+  background: #475569;
+  color: #ffffff;
+}
+
+.btn-modal-delete {
+  background: #dc2626;
+  color: #ffffff;
+  border: none;
+  padding: 0.6rem 1.25rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.1s;
+}
+
+.btn-modal-delete:hover {
+  background: #b91c1c;
+}
+
+.btn-modal-delete:active {
+  transform: scale(0.97);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(12px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+

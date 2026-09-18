@@ -8,9 +8,12 @@
 
   <!--
     Separación App Shell / Contenido:
-    hell.css que estilos estructurales permanentes como header, nav, footer y #app
-    home.css que son estilos específicos de la vista Inicio osea el grid de tarjetas
-    detail.css son estilos específicos de la vista de detalle
+    shell.css: estilos estructurales permanentes como header, nav, footer y #app
+    home.css: estilos específicos de la vista Inicio
+    sightings.css: estilos de la bitácora de avistamientos (IndexedDB)
+    detail.css: estilos específicos de la vista de detalle
+    theme.css: variables y modo oscuro
+    diagnostic.css: vista de diagnóstico
   -->
   <link rel="stylesheet" href="styles/shell.css" />
   <link rel="stylesheet" href="styles/home.css" />
@@ -22,7 +25,7 @@
 
 <body>
 
-  <!-- app shell que se mantiene en toda la vida de la SPA nunca se reemplaza -->
+  <!-- App Shell permanente -->
   <header>
     <h1>Birdify</h1>
     <nav>
@@ -34,11 +37,7 @@
     </nav>
   </header>
 
-  <!--
-    contendor raiz única zona que el router modifica.
-    El skeleton es visible mientras el router resuelve la vista
-    el router lo reemplaza con el HTML real de la vista
-  -->
+  <!-- Contenedor raíz dinámico -->
   <main id="app">
     <div class="skeleton-loader" aria-label="Cargando contenido…" role="status">
       <div class="skeleton-block title"></div>
@@ -48,7 +47,7 @@
     </div>
   </main>
 
-  <!--footer se mantiene en toda la vida de la SPA nunca se reemplaza -->
+  <!-- Footer permanente -->
   <footer>
     <p>Todos los derechos reservados — Birdify</p>
   </footer>

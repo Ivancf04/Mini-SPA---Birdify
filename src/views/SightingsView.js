@@ -78,6 +78,19 @@ export default async function SightingsView() {
           </div>
         </div>
       </div>
+
+      <!-- Modal de Confirmación para Eliminar -->
+      <div id="delete-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+        <div class="modal-card">
+          <div class="modal-icon">⚠️</div>
+          <h3 id="modal-title">¿Eliminar avistamiento?</h3>
+          <p id="modal-desc">¿Estás seguro de que deseas eliminar este registro de tu bitácora? Esta acción no se puede deshacer.</p>
+          <div class="modal-actions">
+            <button id="modal-cancel-btn" type="button" class="btn-modal-cancel">Cancelar</button>
+            <button id="modal-confirm-btn" type="button" class="btn-modal-delete">🗑️ Sí, eliminar</button>
+          </div>
+        </div>
+      </div>
     </section>
   `;
 }

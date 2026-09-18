@@ -69,21 +69,53 @@ document.addEventListener("change", async (event) => {
   const category = event.target.value;
   await refreshSightingsList(category);
 });
-// 3. Eliminar registro
+// Variable para almacenar el ID del avistamiento a eliminar
+let sightingToDeleteId = null;
+
+function openDeleteModal(id) {
+  sightingToDeleteId = id;
+  const modal = document.getElementById("delete-modal");
+  if (modal) modal.style.display = "flex";
+}
+
+function closeDeleteModal() {
+  sightingToDeleteId = null;
+  const modal = document.getElementById("delete-modal");
+  if (modal) modal.style.display = "none";
+}
+
+// 3. Manejo de eliminación con modal de confirmación
 document.addEventListener("click", async (event) => {
+  // Clic en botón "Eliminar" de una tarjeta -> Abre el modal
   const deleteBtn = event.target.closest("[data-delete-id]");
-  if (!deleteBtn) return;
-  const id = Number(deleteBtn.dataset.deleteId);
-  if (!confirm("¿Deseas eliminar este registro de avistamiento?")) return;
-  try {
-    await deleteSighting(id);
-    showDbFeedback("Registro eliminado correctamente.", false);
-    const filterSelect = document.getElementById("filter-category");
-    const currentFilter = filterSelect ? filterSelect.value : "ALL";
-    await refreshSightingsList(currentFilter);
-  } catch (error) {
-    console.error("Error al eliminar de IndexedDB:", error);
-    showDbFeedback("No se pudo eliminar el registro.", true);
+  if (deleteBtn) {
+    const id = Number(deleteBtn.dataset.deleteId);
+    openDeleteModal(id);
+    return;
+  }
+
+  // Clic en "Cancelar" o en el fondo del modal -> Cierra el modal
+  if (event.target.id === "modal-cancel-btn" || event.target.id === "delete-modal") {
+    closeDeleteModal();
+    return;
+  }
+
+  // Clic en "Sí, eliminar" dentro del modal -> Ejecuta el borrado en IndexedDB
+  if (event.target.id === "modal-confirm-btn") {
+    if (!sightingToDeleteId) return;
+    const id = sightingToDeleteId;
+    closeDeleteModal();
+
+    try {
+      await deleteSighting(id);
+      showDbFeedback("Registro eliminado correctamente de IndexedDB.", false);
+      const filterSelect = document.getElementById("filter-category");
+      const currentFilter = filterSelect ? filterSelect.value : "ALL";
+      await refreshSightingsList(currentFilter);
+    } catch (error) {
+      console.error("Error al eliminar de IndexedDB:", error);
+      showDbFeedback("No se pudo eliminar el registro.", true);
+    }
   }
 });
 // Función auxiliar para recargar la lista según el filtro
