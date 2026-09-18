@@ -1,58 +1,23 @@
 <!DOCTYPE html>
 <html lang="es">
-
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Birdify — Catálogo de Aves</title>
+  <meta charset="utf-8">
+  <title>Birdify — Cargando...</title>
+  <script type="text/javascript">
+    // Script de redirección para SPAs en GitHub Pages (spa-github-pages)
+    // 1 para repositorios de proyecto (https://<usuario>.github.io/<repo>/)
+    var pathSegmentsToKeep = 1;
 
-  <!--
-    Separación App Shell / Contenido:
-    shell.css: estilos estructurales permanentes como header, nav, footer y #app
-    home.css: estilos específicos de la vista Inicio
-    sightings.css: estilos de la bitácora de avistamientos (IndexedDB)
-    detail.css: estilos específicos de la vista de detalle
-    theme.css: variables y modo oscuro
-    diagnostic.css: vista de diagnóstico
-  -->
-  <link rel="stylesheet" href="styles/shell.css" />
-  <link rel="stylesheet" href="styles/home.css" />
-  <link rel="stylesheet" href="styles/sightings.css" />
-  <link rel="stylesheet" href="styles/detail.css" />
-  <link rel="stylesheet" href="styles/theme.css" />
-  <link rel="stylesheet" href="styles/diagnostic.css" />
+    var l = window.location;
+    l.replace(
+      l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
+      l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') + '/?/' +
+      l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
+      (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
+      l.hash
+    );
+  </script>
 </head>
-
 <body>
-
-  <!-- App Shell permanente -->
-  <header>
-    <h1>Birdify</h1>
-    <nav>
-      <a href="/" data-link>Inicio</a>
-      <a href="/acerca" data-link>Nosotros</a>
-      <a href="/avistamientos" data-link>Avistamientos</a>
-      <a href="/diagnostico" data-link>Diagnóstico</a>
-      <button id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">🌙</button>
-    </nav>
-  </header>
-
-  <!-- Contenedor raíz dinámico -->
-  <main id="app">
-    <div class="skeleton-loader" aria-label="Cargando contenido…" role="status">
-      <div class="skeleton-block title"></div>
-      <div class="skeleton-block card"></div>
-      <div class="skeleton-block card"></div>
-      <div class="skeleton-block card"></div>
-    </div>
-  </main>
-
-  <!-- Footer permanente -->
-  <footer>
-    <p>Todos los derechos reservados — Birdify</p>
-  </footer>
-
-  <script type="module" src="src/main.js"></script>
 </body>
-
 </html>
