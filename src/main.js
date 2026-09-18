@@ -1,6 +1,7 @@
 import Router from "./router/router.js";
 import HomeView from "./views/HomeView.js";
 import AboutView from "./views/AboutView.js";
+import SightingsView from "./views/SightingsView.js";
 import ItemDetailView from "./views/ItemDetailView.js";
 import DiagnosticView from "./views/DiagnosticView.js";
 import { KEYS, getLocal, setLocal, removeLocal, getCookie, setCookie, deleteCookie, setSession, removeSession } from "./utils/storage.js";
@@ -9,6 +10,7 @@ const routes = [
   { path: "/index.html", view: HomeView }, // Para funcionamiento directo en Live Server
   { path: "/", view: HomeView },
   { path: "/acerca", view: AboutView },
+  { path: "/avistamientos", view: SightingsView },
   { path: "/diagnostico", view: DiagnosticView },
   { path: "/item/:id", view: ItemDetailView },
 ];
