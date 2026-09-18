@@ -4,7 +4,23 @@ import AboutView from "./views/AboutView.js";
 import SightingsView from "./views/SightingsView.js";
 import ItemDetailView from "./views/ItemDetailView.js";
 import DiagnosticView from "./views/DiagnosticView.js";
-import { KEYS, getLocal, setLocal, removeLocal, getCookie, setCookie, deleteCookie, setSession, removeSession } from "./utils/storage.js";
+import { 
+  KEYS, 
+  getLocal, 
+  setLocal, 
+  removeLocal, 
+  getCookie, 
+  setCookie, 
+  deleteCookie, 
+  setSession, 
+  removeSession } from "./utils/storage.js";
+import {
+  saveSighting,
+  getAllSightings,
+  getSightingsByCategory,
+  deleteSighting,
+} from "./services/dbService.js";
+import { renderSightingsList } from "./views/SightingsView.js";
 
 const routes = [
   { path: "/index.html", view: HomeView }, // Para funcionamiento directo en Live Server
