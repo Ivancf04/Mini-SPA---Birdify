@@ -22,6 +22,87 @@ import {
 } from "./services/dbService.js";
 import { renderSightingsList } from "./views/SightingsView.js";
 
+// Función utilitaria para mostrar alertas visuales al usuario
+function showDbFeedback(message, isError = false) {
+  const banner = document.getElementById("db-feedback");
+  if (!banner) return;
+  banner.textContent = message;
+  banner.className = `feedback-banner ${isError ? "feedback-banner--error" : "feedback-banner--success"}`;
+  banner.style.display = "block";
+  setTimeout(() => {
+    banner.style.display = "none";
+  }, 4000);
+}
+// 1. Guardar nuevo registro (con try / catch y feedback visual)
+document.addEventListener("submit", async (event) => {
+  if (event.target.id !== "sighting-form") return;
+  event.preventDefault();
+  const form = event.target;
+  const formData = new FormData(form);
+  const sighting = {
+    birdName: formData.get("birdName").trim(),
+    location: formData.get("location").trim(),
+    category: formData.get("category"),
+    date: formData.get("date"),
+    notes: formData.get("notes").trim(),
+    createdAt: new Date().toISOString(),
+  };
+  try {
+    // Operación de escritura en IndexedDB
+    await saveSighting(sighting);
+    showDbFeedback("¡Avistamiento guardado exitosamente en IndexedDB!", false);
+    form.reset();
+    document.getElementById("bird-date").value = new Date().toISOString().split("T")[0];
+    // Refrescar la lista de registros
+    const filterSelect = document.getElementById("filter-category");
+    const currentFilter = filterSelect ? filterSelect.value : "ALL";
+    await refreshSightingsList(currentFilter);
+  } catch (error) {
+    // Requisito 3: Manejo de errores con feedback visible
+    console.error("Fallo al guardar en IndexedDB:", error);
+    showDbFeedback(`Error al guardar el avistamiento: ${error.message || "Fallo en la base de datos local."}`, true);
+  }
+});
+// 2. Filtrar registros usando el Índice de IndexedDB
+document.addEventListener("change", async (event) => {
+  if (event.target.id !== "filter-category") return;
+  const category = event.target.value;
+  await refreshSightingsList(category);
+});
+// 3. Eliminar registro
+document.addEventListener("click", async (event) => {
+  const deleteBtn = event.target.closest("[data-delete-id]");
+  if (!deleteBtn) return;
+  const id = Number(deleteBtn.dataset.deleteId);
+  if (!confirm("¿Deseas eliminar este registro de avistamiento?")) return;
+  try {
+    await deleteSighting(id);
+    showDbFeedback("Registro eliminado correctamente.", false);
+    const filterSelect = document.getElementById("filter-category");
+    const currentFilter = filterSelect ? filterSelect.value : "ALL";
+    await refreshSightingsList(currentFilter);
+  } catch (error) {
+    console.error("Error al eliminar de IndexedDB:", error);
+    showDbFeedback("No se pudo eliminar el registro.", true);
+  }
+});
+// Función auxiliar para recargar la lista según el filtro
+async function refreshSightingsList(category = "ALL") {
+  const listContainer = document.getElementById("sightings-list");
+  if (!listContainer) return;
+  try {
+    let items;
+    if (category === "ALL") {
+      items = await getAllSightings(); // db.getAll
+    } else {
+      items = await getSightingsByCategory(category); // db.getAllFromIndex
+    }
+    listContainer.innerHTML = renderSightingsList(items);
+  } catch (error) {
+    listContainer.innerHTML = `<p class="error-text">Error al leer los datos: ${error.message}</p>`;
+  }
+}
+
 const routes = [
   { path: "/index.html", view: HomeView }, // Para funcionamiento directo en Live Server
   { path: "/", view: HomeView },
