@@ -1,5 +1,5 @@
 /* ==========================================================
-   Sección de diagnóstico de storage, integrada en AboutView.
+   Sección de diagnóstico de storage y Service Worker
    ========================================================== */
 
 .diagnostic-panel {
@@ -42,4 +42,61 @@
 
 .btn-clear:hover {
   background: #dc2626;
+}
+
+/* Resaltado de activado */
+.badge-state-activated,
+.badge-state-active {
+  background: #d1fae5;
+  color: #065f46;
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+
+/* Tabla del verificador de scope */
+.scope-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 0.5rem;
+}
+
+.scope-table th,
+.scope-table td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e5e7eb;
+  text-align: left;
+  font-size: 0.9rem;
+}
+
+/* Botones de acción */
+.btn-action,
+.btn-warning {
+  padding: 0.4rem 0.8rem;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.btn-action {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-warning {
+  background: #d97706;
+  color: white;
+  margin-top: 0.5rem;
+}
+
+/* Feedback de error de scope */
+.feedback-box--error {
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 4px;
+  font-size: 0.85rem;
 }

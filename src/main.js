@@ -21,6 +21,11 @@ import {
   deleteSighting,
 } from "./services/dbService.js";
 import { renderSightingsList } from "./views/SightingsView.js";
+import {
+  registerServiceWorker,
+  getSWDiagnosticData,
+  registerInvalidScope,
+} from "./pwa/registerSW.js";
 
 // Función utilitaria para mostrar alertas visuales al usuario
 function showDbFeedback(message, isError = false) {
@@ -195,8 +200,8 @@ document.addEventListener("input", (event) => {
   });
 });
 
-//Botones "Limpiar" de la vista de diagnóstico (Acerca)
-document.addEventListener("click", (event) => {
+//Botones "Limpiar" y acciones de diagnóstico
+document.addEventListener("click", async (event) => {
   if (event.target.id === "clear-theme-btn") {
     removeLocal(KEYS.THEME);
     document.documentElement.removeAttribute("data-theme");
@@ -217,8 +222,77 @@ document.addEventListener("click", (event) => {
     const out = document.getElementById("diag-visits-value");
     if (out) out.textContent = "0";
   }
+
+  // Boton "Actualizar estado" del Service Worker en DiagnosticView
+  if (event.target.id === "refresh-sw-btn") {
+    const swData = await getSWDiagnosticData();
+    const supEl = document.getElementById("diag-sw-supported");
+    const secEl = document.getElementById("diag-sw-secure");
+    const regEl = document.getElementById("diag-sw-registered");
+    const ctrlEl = document.getElementById("diag-sw-controls");
+    const scopeEl = document.getElementById("diag-sw-scope");
+    const scriptEl = document.getElementById("diag-sw-script");
+    const stateEl = document.getElementById("diag-sw-state");
+
+    if (supEl) {
+      supEl.textContent = swData.supported ? "Si" : "No";
+      supEl.className = `diagnostic-value ${swData.supported ? "badge-success" : "badge-error"}`;
+    }
+    if (secEl) {
+      secEl.textContent = swData.isSecure ? "Si (isSecureContext)" : "No";
+      secEl.className = `diagnostic-value ${swData.isSecure ? "badge-success" : "badge-error"}`;
+    }
+    if (regEl) {
+      regEl.textContent = swData.registered ? "Si" : "No";
+      regEl.className = `diagnostic-value ${swData.registered ? "badge-success" : "badge-warning"}`;
+    }
+    if (ctrlEl) {
+      ctrlEl.textContent = swData.controlsPage
+        ? "Si (navigator.serviceWorker.controller activo)"
+        : "No (normal en primera carga, recarga con F5)";
+      ctrlEl.className = `diagnostic-value ${swData.controlsPage ? "badge-success" : "badge-warning"}`;
+    }
+    if (scopeEl) scopeEl.textContent = swData.scope;
+    if (scriptEl) scriptEl.textContent = swData.scriptURL;
+    if (stateEl) {
+      stateEl.textContent = swData.state.toUpperCase();
+      stateEl.className = `badge-status badge-state-${swData.state}`;
+    }
+  }
+
+  // Boton "Intentar registrar con scope invalido" en DiagnosticView
+  if (event.target.id === "test-invalid-scope-btn") {
+    const feedbackEl = document.getElementById("invalid-scope-feedback");
+    if (!feedbackEl) return;
+    feedbackEl.style.display = "block";
+    feedbackEl.className = "feedback-box feedback-box--error";
+    feedbackEl.innerHTML = "Intentando registrar con scope no permitido...";
+
+    try {
+      await registerInvalidScope();
+      feedbackEl.className = "feedback-box";
+      feedbackEl.innerHTML = "El navegador permitio el registro (inesperado si el scope es superior).";
+    } catch (error) {
+      console.warn("[Experimento Scope Invalido] Error capturado:", error);
+      feedbackEl.className = "feedback-box feedback-box--error";
+      feedbackEl.innerHTML = `
+        <strong>Error de seguridad capturado (${error.name || "Error"}):</strong>
+        <p>El navegador rechazo el registro porque el scope solicitado esta fuera del alcance maximo permitido para este script.</p>
+        <pre>${error.name}: ${error.message}</pre>
+      `;
+    }
+  }
 });
 
 initTheme();
 trackVisit();
 router.init();
+
+// Requisito: Registro al cargar la página usando el evento load
+window.addEventListener("load", async () => {
+  try {
+    await registerServiceWorker();
+  } catch (error) {
+    console.error("[main.js] No se pudo registrar el Service Worker al cargar:", error);
+  }
+});
