@@ -29,7 +29,7 @@ import {
   deleteCachedUrl,
 } from "./pwa/registerSW.js";
 
-// Requisito 5: Funciones utilitarias expuestas globalmente en la consola de DevTools
+// Funciones utilitarias expuestas globalmente en la consola de DevTools
 window.deleteCacheEntry = async function (url) {
   const ok = await deleteCachedUrl(url);
   console.log(`[Cache Delete] Eliminación de '${url}': ${ok ? "EXITOSA" : "FALLIDA / NO ENCONTRADA"}`);
