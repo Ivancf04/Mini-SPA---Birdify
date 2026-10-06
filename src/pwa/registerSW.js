@@ -163,3 +163,49 @@ export async function registerInvalidScope() {
     scope: invalidScope,
   });
 }
+
+/**
+ * Obtiene todas las URLs almacenadas en la versión activa de la caché.
+ * @returns {Promise<Array<{url: string, path: string}>>}
+ */
+export async function getCachedUrls() {
+  if (!("caches" in window)) return [];
+  try {
+    const cacheNames = await caches.keys();
+    const currentCacheName =
+      cacheNames.find((name) => name.startsWith("birdify-shell")) || cacheNames[0];
+    if (!currentCacheName) return [];
+    const cache = await caches.open(currentCacheName);
+    const requests = await cache.keys();
+    return requests.map((req) => ({
+      url: req.url,
+      path: new URL(req.url).pathname,
+    }));
+  } catch (error) {
+    console.error("[registerSW] Error al listar entradas de caché:", error);
+    return [];
+  }
+}
+/**
+ * Elimina una entrada específica de la cache mediante cache.delete().
+ * @param {string} url - URL completa a eliminar
+ * @returns {Promise<boolean>}
+ */
+export async function deleteCachedUrl(url) {
+  if (!("caches" in window)) return false;
+  try {
+    const cacheNames = await caches.keys();
+    for (const name of cacheNames) {
+      const cache = await caches.open(name);
+      const deleted = await cache.delete(url);
+      if (deleted) {
+        console.log(`[Cache API] Entrada eliminada exitosamente: ${url} de '${name}'`);
+        return true;
+      }
+    }
+    return false;
+  } catch (error) {
+    console.error("[registerSW] Error al eliminar entrada de cache", error);
+    return false;
+  }
+}
