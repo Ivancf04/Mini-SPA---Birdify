@@ -23,10 +23,12 @@ const APP_SHELL_FILES = [
   "./src/main.js",
 ];
 
-//Precache en install
+// Precache en evento install
 self.addEventListener("install", (event) => {
+  console.log(`[SW] Instalando versión: ${CACHE_VERSION}`);
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => {
+      console.log("[SW] Precacheando App Shell...");
       return cache.addAll(APP_SHELL_FILES);
     })
   );
