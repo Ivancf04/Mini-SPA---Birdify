@@ -327,11 +327,17 @@ initTheme();
 trackVisit();
 router.init();
 
-// Requisito: Registro al cargar la página usando el evento load
-window.addEventListener("load", async () => {
+// Requisito: Registro del Service Worker al cargar (o inmediato si ya cargó)
+async function initSW() {
   try {
     await registerServiceWorker();
   } catch (error) {
-    console.error("[main.js] No se pudo registrar el Service Worker al cargar:", error);
+    console.error("[main.js] No se pudo registrar el Service Worker:", error);
   }
-});
+}
+
+if (document.readyState === "complete" || document.readyState === "interactive") {
+  initSW();
+} else {
+  window.addEventListener("load", initSW);
+}
