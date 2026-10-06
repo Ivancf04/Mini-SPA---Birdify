@@ -13,7 +13,6 @@ const CACHE_VERSION = "birdify-shell-v1";
 //Lista de recursos del App Shell
 const APP_SHELL_FILES = [
   "./",
-  "./index.html",
   "./styles/shell.css",
   "./styles/home.css",
   "./styles/sightings.css",
@@ -66,6 +65,16 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Función auxiliar para limpiar respuestas con redirección (ej. 301 de servidores locales)
+function sanitizeResponse(response) {
+  if (!response || !response.redirected) return response;
+  return new Response(response.body, {
+    status: response.status || 200,
+    statusText: response.statusText || "OK",
+    headers: response.headers,
+  });
+}
+
 //Evento fetch
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
@@ -84,10 +93,10 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       caches.open(CACHE_VERSION).then(async (cache) => {
         const cachedIndex =
-          (await cache.match("./index.html")) || (await cache.match("./"));
+          (await cache.match("./")) || (await cache.match("./index.html"));
         if (cachedIndex) {
           console.log(`[SW] HIT (Navegación -> App Shell): ${event.request.url}`);
-          return cachedIndex;
+          return sanitizeResponse(cachedIndex);
         }
         console.log(`[SW] MISS (Navegación): ${event.request.url}`);
         return fetch(event.request);
@@ -103,7 +112,7 @@ self.addEventListener("fetch", (event) => {
       const cachedResponse = await cache.match(event.request);
       if (cachedResponse) {
         console.log(`[SW] HIT: ${event.request.url}`);
-        return cachedResponse;
+        return sanitizeResponse(cachedResponse);
       }
       console.log(`[SW] MISS: ${event.request.url}`);
       try {
