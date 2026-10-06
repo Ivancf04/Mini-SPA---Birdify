@@ -25,8 +25,12 @@ import {
   registerServiceWorker,
   getSWDiagnosticData,
   registerInvalidScope,
+  getCachedUrls,
+  deleteCachedUrl,
 } from "./pwa/registerSW.js";
 
+window.deleteCacheEntry = deleteCachedUrl;
+window.listCacheEntries = getCachedUrls;
 // Función utilitaria para mostrar alertas visuales al usuario
 function showDbFeedback(message, isError = false) {
   const banner = document.getElementById("db-feedback");
@@ -120,6 +124,41 @@ document.addEventListener("click", async (event) => {
     } catch (error) {
       console.error("Error al eliminar de IndexedDB:", error);
       showDbFeedback("No se pudo eliminar el registro.", true);
+    }
+  }
+
+  // Boton "Actualizar lista de cache"
+  if (event.target.id === "refresh-cache-btn") {
+    const tbody = document.getElementById("cache-table-body");
+    if (!tbody) return;
+    const entries = await getCachedUrls();
+    if (entries.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="2" style="text-align: center; color: #6b7280;">No hay entradas en cache.</td></tr>`;
+    } else {
+      tbody.innerHTML = entries
+        .map(
+          (entry) => `
+            <tr>
+              <td><code>${entry.path}</code></td>
+              <td style="text-align: center;">
+                <button type="button" class="btn-clear delete-cache-entry-btn" data-cache-url="${entry.url}">
+                  Eliminar
+                </button>
+              </td>
+            </tr>
+          `
+        )
+        .join("");
+    }
+  }
+  // Boton "Eliminar" individual de una entrada de cache
+  const deleteCacheBtn = event.target.closest(".delete-cache-entry-btn");
+  if (deleteCacheBtn) {
+    const url = deleteCacheBtn.dataset.cacheUrl;
+    const confirmed = confirm(`¿Deseas eliminar '${url}' de la caché?`);
+    if (confirmed) {
+      await deleteCachedUrl(url);
+      deleteCacheBtn.closest("tr")?.remove();
     }
   }
 });
