@@ -50,3 +50,62 @@ self.addEventListener("activate", (event) => {
     })
   );
 });
+
+//Evento fetch
+self.addEventListener("fetch", (event) => {
+  const url = new URL(event.request.url);
+  //FILTRO 1 — Solo atender peticiones GET
+  if (event.request.method !== "GET") {
+    return;
+  }
+
+  //FILTRO 2 — Solo atender peticiones del mismo origen
+  if (url.origin !== self.location.origin) {
+    return;
+  }
+
+  //Navegaciones del Router SPA (request.mode === "navigate")
+  if (event.request.mode === "navigate") {
+    event.respondWith(
+      caches.open(CACHE_VERSION).then(async (cache) => {
+        const cachedIndex =
+          (await cache.match("./index.html")) || (await cache.match("./"));
+        if (cachedIndex) {
+          console.log(`[SW] HIT (Navegación -> App Shell): ${event.request.url}`);
+          return cachedIndex;
+        }
+        console.log(`[SW] MISS (Navegación): ${event.request.url}`);
+        return fetch(event.request);
+      })
+    );
+    return;
+  }
+  
+  //Estrategia Cache First con Guardado en Runtime
+  event.respondWith(
+    caches.open(CACHE_VERSION).then(async (cache) => {
+      //Busqueda previa en cache con registro HIT / MISS
+      const cachedResponse = await cache.match(event.request);
+      if (cachedResponse) {
+        console.log(`[SW] HIT: ${event.request.url}`);
+        return cachedResponse;
+      }
+      console.log(`[SW] MISS: ${event.request.url}`);
+      try {
+        // Petición a la red si no estaba en caché
+        const networkResponse = await fetch(event.request);
+
+        //Guardado en runtime solo si response.ok (status 200-299)
+        //Por que: No debemos almacenar respuestas erróneas (404, 500) en cache.
+        if (networkResponse && networkResponse.ok) {
+          const responseClone = networkResponse.clone();
+          event.waitUntil(cache.put(event.request, responseClone));
+        }
+        return networkResponse;
+      } catch (error) {
+        console.error(`[SW] Error de red al solicitar: ${event.request.url}`, error);
+        throw error;
+      }
+    })
+  );
+});
