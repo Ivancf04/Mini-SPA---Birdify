@@ -34,14 +34,18 @@ self.addEventListener("install", (event) => {
   );
 });
 
-//Limpieza de versiones viejas en activate
+//Limpieza de versiones anteriores en evento activate
 self.addEventListener("activate", (event) => {
+  console.log(`[SW] Activando versión: ${CACHE_VERSION}`);
   event.waitUntil(
     caches.keys().then((cacheNames) => {
       return Promise.all(
         cacheNames
           .filter((name) => name !== CACHE_VERSION)
-          .map((name) => caches.delete(name))
+          .map((name) => {
+            console.log(`[SW] Eliminando caché obsoleta: ${name}`);
+            return caches.delete(name);
+          })
       );
     })
   );
