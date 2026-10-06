@@ -4,6 +4,7 @@ import {
   SW_SCOPE,
   getSWDiagnosticData,
   checkRouteInScope,
+  getCachedUrls,
 } from "../pwa/registerSW.js";
 
 /**
@@ -21,6 +22,9 @@ export default async function DiagnosticView() {
 
   // Datos en vivo del Service Worker
   const swData = await getSWDiagnosticData();
+
+  // Entradas actuales en Cache Storage
+  const cachedEntries = await getCachedUrls();
 
   // Definicion de las 5 rutas minimas requeridas para la verificacion de scope:
   // 1. La raiz del proyecto
@@ -175,6 +179,56 @@ export default async function DiagnosticView() {
 
         <div id="invalid-scope-feedback" class="feedback-box" style="display: none;"></div>
       </div>
+
+            <!-- 5. Herramienta de depuracion: Gestion de Cache Storage (Cache API) -->
+      <div class="card diagnostic-panel">
+        <div class="diagnostic-panel-header">
+          <h2>Gestion de Cache Storage (Cache API)</h2>
+          <button id="refresh-cache-btn" type="button" class="btn-action">
+            Actualizar lista
+          </button>
+        </div>
+        <p class="subtitle">
+          Recursos guardados en la cache activa. Usa <code>cache.delete()</code> para eliminar una entrada y probar datos desactualizados.
+        </p>
+
+        <div class="table-container">
+          <table class="scope-table">
+            <thead>
+              <tr>
+                <th>Recurso en Cache</th>
+                <th style="width: 120px; text-align: center;">Accion</th>
+              </tr>
+            </thead>
+            <tbody id="cache-table-body">
+              ${
+                cachedEntries.length === 0
+                  ? `<tr><td colspan="2" style="text-align: center; color: #6b7280;">No hay entradas en cache todavia.</td></tr>`
+                  : cachedEntries
+                      .map(
+                        (entry) => `
+                    <tr>
+                      <td><code>${entry.path}</code></td>
+                      <td style="text-align: center;">
+                        <button 
+                          type="button" 
+                          class="btn-clear delete-cache-entry-btn" 
+                          data-cache-url="${entry.url}"
+                          title="Eliminar esta entrada de Cache Storage"
+                        >
+                          Eliminar
+                        </button>
+                      </td>
+                    </tr>
+                  `
+                      )
+                      .join("")
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
 
       <!-- 4. Diagnóstico de Almacenamiento (Persistencia previa) -->
       <div class="card diagnostic-panel">
