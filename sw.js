@@ -26,28 +26,43 @@ const APP_SHELL_FILES = [
 // Precache en evento install
 self.addEventListener("install", (event) => {
   console.log(`[SW] Instalando versión: ${CACHE_VERSION}`);
+  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => {
       console.log("[SW] Precacheando App Shell...");
-      return cache.addAll(APP_SHELL_FILES);
+      return cache.addAll(APP_SHELL_FILES).catch((err) => {
+        console.warn("[SW] Advertencia en cache.addAll, asegurando precache:", err);
+        return Promise.all(
+          APP_SHELL_FILES.map((url) =>
+            fetch(url)
+              .then((res) => {
+                if (res.ok) return cache.put(url, res);
+              })
+              .catch((e) => console.warn(`[SW] Falló precache de ${url}:`, e))
+          )
+        );
+      });
     })
   );
 });
 
-//Limpieza de versiones anteriores en evento activate
+// Limpieza de versiones anteriores en evento activate
 self.addEventListener("activate", (event) => {
   console.log(`[SW] Activando versión: ${CACHE_VERSION}`);
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames
-          .filter((name) => name !== CACHE_VERSION)
-          .map((name) => {
-            console.log(`[SW] Eliminando caché obsoleta: ${name}`);
-            return caches.delete(name);
-          })
-      );
-    })
+    caches
+      .keys()
+      .then((cacheNames) => {
+        return Promise.all(
+          cacheNames
+            .filter((name) => name !== CACHE_VERSION)
+            .map((name) => {
+              console.log(`[SW] Eliminando caché obsoleta: ${name}`);
+              return caches.delete(name);
+            })
+        );
+      })
+      .then(() => self.clients.claim())
   );
 });
 
