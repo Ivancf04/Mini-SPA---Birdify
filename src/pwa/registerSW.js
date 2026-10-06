@@ -165,30 +165,41 @@ export async function registerInvalidScope() {
 }
 
 /**
- * Obtiene todas las URLs almacenadas en la versión activa de la caché.
- * @returns {Promise<Array<{url: string, path: string}>>}
+ * Obtiene todas las URLs almacenadas en cualquier versión activa de la caché.
+ * @returns {Promise<Array<{url: string, path: string, cacheName: string}>>}
  */
 export async function getCachedUrls() {
-  if (!("caches" in window)) return [];
+  if (!("caches" in window)) {
+    console.warn("[registerSW] Cache API no soportada en este navegador.");
+    return [];
+  }
   try {
     const cacheNames = await caches.keys();
-    const currentCacheName =
-      cacheNames.find((name) => name.startsWith("birdify-shell")) || cacheNames[0];
-    if (!currentCacheName) return [];
-    const cache = await caches.open(currentCacheName);
-    const requests = await cache.keys();
-    return requests.map((req) => ({
-      url: req.url,
-      path: new URL(req.url).pathname,
-    }));
+    console.log("[registerSW] Caches existentes:", cacheNames);
+    if (cacheNames.length === 0) return [];
+
+    const allEntries = [];
+    for (const name of cacheNames) {
+      const cache = await caches.open(name);
+      const requests = await cache.keys();
+      for (const req of requests) {
+        allEntries.push({
+          url: req.url,
+          path: new URL(req.url).pathname,
+          cacheName: name,
+        });
+      }
+    }
+    return allEntries;
   } catch (error) {
     console.error("[registerSW] Error al listar entradas de caché:", error);
     return [];
   }
 }
+
 /**
- * Elimina una entrada específica de la cache mediante cache.delete().
- * @param {string} url - URL completa a eliminar
+ * Elimina una entrada específica de la caché mediante cache.delete().
+ * @param {string} url - URL completa o relativa a eliminar
  * @returns {Promise<boolean>}
  */
 export async function deleteCachedUrl(url) {
@@ -205,7 +216,7 @@ export async function deleteCachedUrl(url) {
     }
     return false;
   } catch (error) {
-    console.error("[registerSW] Error al eliminar entrada de cache", error);
+    console.error("[registerSW] Error al eliminar entrada de caché:", error);
     return false;
   }
 }

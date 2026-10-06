@@ -29,8 +29,30 @@ import {
   deleteCachedUrl,
 } from "./pwa/registerSW.js";
 
-window.deleteCacheEntry = deleteCachedUrl;
-window.listCacheEntries = getCachedUrls;
+// Requisito 5: Funciones utilitarias expuestas globalmente en la consola de DevTools
+window.deleteCacheEntry = async function (url) {
+  const ok = await deleteCachedUrl(url);
+  console.log(`[Cache Delete] Eliminación de '${url}': ${ok ? "EXITOSA" : "FALLIDA / NO ENCONTRADA"}`);
+  return ok;
+};
+
+window.listCacheEntries = async function () {
+  const entries = await getCachedUrls();
+  console.log("=== ENTRADAS EN CACHE STORAGE ===");
+  if (entries.length === 0) {
+    console.warn("No hay entradas en caché todavía o el SW aún se está instalando.");
+  } else {
+    console.table(entries);
+  }
+  return entries;
+};
+
+window.checkSW = async function () {
+  const data = await getSWDiagnosticData();
+  console.log("=== DIAGNÓSTICO DEL SERVICE WORKER ===");
+  console.table(data);
+  return data;
+};
 // Función utilitaria para mostrar alertas visuales al usuario
 function showDbFeedback(message, isError = false) {
   const banner = document.getElementById("db-feedback");
