@@ -1,4 +1,5 @@
-import { openDB } from "https://cdn.jsdelivr.net/npm/idb@8/+esm";
+// Versión fijada (8.0.4): debe coincidir con IDB_MODULE_URL en sw.js, que la precachea.
+import { openDB } from "https://cdn.jsdelivr.net/npm/idb@8.0.4/+esm";
 
 const DB_NAME = "BirdifyDB";
 const DB_VERSION = 1;

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "consejos": [
+    {
+      "titulo": "Muévete despacio",
+      "texto": "Los movimientos bruscos espantan a las aves antes de que puedas verlas; camina con pausas."
+    },
+    {
+      "titulo": "Escucha primero",
+      "texto": "Muchas especies se detectan antes por su canto que por su plumaje."
+    },
+    {
+      "titulo": "Anota en el momento",
+      "texto": "Registra lugar, hora y comportamiento en la bitácora de avistamientos antes de que se te olvide."
+    },
+    {
+      "titulo": "Respeta la distancia",
+      "texto": "Si el ave cambia su comportamiento por tu presencia, ya estás demasiado cerca."
+    }
+  ]
+}

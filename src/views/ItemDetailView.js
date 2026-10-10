@@ -25,6 +25,14 @@ export default async function ItemDetailView(params) {
         title: "Error de conexion o CORS",
         message: "No fue posible conectar con la api para obtener el detalle.",
       };
+    } else if (err.status === 503) {
+      // 503 generado por el Service Worker: sin red y sin copia de esta ave
+      errorDetails = {
+        badge: "Sin conexión",
+        badgeClass: "error-badge--timeout",
+        title: "Esta ficha no está guardada en tu dispositivo",
+        message: "Solo se pueden ver sin red las aves que ya abriste antes con conexión.",
+      };
     } else if (err.status) {
       // si el servidor mando error
       errorDetails = {
@@ -81,11 +89,10 @@ export default async function ItemDetailView(params) {
       <p class="scientific-name"><em>${item.scientificName}</em></p>
       <p>${item.description}</p>
       <small>${item.meta}</small>
-      ${
-        item.wikipediaUrl
-          ? `<p><a href="${item.wikipediaUrl}" target="_blank" rel="noopener noreferrer" class="external-link">Ver más detalles en Wikipedia ↗</a></p>`
-          : ""
-      }
+      ${item.wikipediaUrl
+      ? `<p><a href="${item.wikipediaUrl}" target="_blank" rel="noopener noreferrer" class="external-link">Ver más detalles en Wikipedia ↗</a></p>`
+      : ""
+    }
       <a href="/" data-link class="back-link">← Volver al inicio</a>
     </div>
   `;

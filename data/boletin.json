@@ -1,0 +1,19 @@
+{
+  "edicion": 2,
+  "actualizado": "2026-10-09T22:10:00-07:00",
+  "titulo": "Boletín de campo Birdify",
+  "avisos": [
+    {
+      "tipo": "Migración",
+      "texto": "Se reportan los primeros colibríes migratorios en jardines del norte de la ciudad."
+    },
+    {
+      "tipo": "Clima",
+      "texto": "Mañanas despejadas esta semana: la mejor ventana de observación es de 6:30 a 9:00."
+    },
+    {
+      "tipo": "Comunidad",
+      "texto": "Salida grupal al humedal el sábado. Lleva binoculares, agua y ropa de colores neutros."
+    }
+  ]
+}

@@ -5,6 +5,8 @@
  * TODO (Ejercicio - Parte A, punto 1): agrega soporte para rutas con
  * parámetros, como "/item/:id", dentro de matchRoute().
  */
+import { BASE_PATH } from "../pwa/registerSW.js";
+
 export default class Router {
   constructor(routes, rootElement) {
     this.routes = routes;
@@ -21,8 +23,18 @@ export default class Router {
   }
 
   navigate(path) {
-    window.history.pushState({}, "", path);
+    window.history.pushState({}, "", this.toAppPath(path));
     this.render();
+  }
+
+  /**
+   * Los enlaces usan rutas absolutas ("/acerca"). En GitHub Pages la app vive en
+   * "/Mini-SPA---Birdify/", así que se antepone BASE_PATH para que la URL siga
+   * dentro del scope del Service Worker y un F5 (incluso sin red) cargue Birdify.
+   */
+  toAppPath(path) {
+    if (BASE_PATH === "/" || path.startsWith(BASE_PATH)) return path;
+    return BASE_PATH + path.replace(/^\//, "");
   }
 
   /**

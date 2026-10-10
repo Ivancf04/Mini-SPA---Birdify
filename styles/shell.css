@@ -237,3 +237,99 @@ footer {
     margin-inline: auto;
   }
 }
+/* ── Estado de conectividad (Ejercicio 4 · Offline First) ── */
+.network-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  background: #fef3c7;
+  color: #78350f;
+  border: 1px solid #fbbf24;
+  animation: network-pulse 2s ease-in-out infinite;
+}
+
+.network-badge[data-variant="fallback"] {
+  background: #e0e7ff;
+  color: #312e81;
+  border-color: #a5b4fc;
+  animation: none;
+}
+
+.network-badge[hidden],
+.network-banner[hidden] {
+  display: none;
+}
+
+.network-banner {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  padding: 0.6rem 1rem;
+  font-size: 0.875rem;
+  text-align: center;
+  background: #fffbeb;
+  color: #78350f;
+  border-bottom: 1px solid #fcd34d;
+}
+
+.network-banner[data-variant="fallback"] {
+  background: #eef2ff;
+  color: #312e81;
+  border-bottom-color: #a5b4fc;
+}
+
+.network-banner[data-variant="online"] {
+  background: #ecfdf5;
+  color: #065f46;
+  border-bottom-color: #6ee7b7;
+}
+
+@keyframes network-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.6); }
+  50% { box-shadow: 0 0 0 0.35rem rgba(251, 191, 36, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .network-badge { animation: none; }
+}
+
+/* ── Contenido propio servido desde /data (boletín y consejos) ── */
+.content-panel {
+  border-left: 4px solid #018547;
+  margin-bottom: 1.5rem;
+}
+
+.content-panel h2,
+.content-panel h3 {
+  margin-top: 0;
+}
+
+.content-panel ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.1rem;
+}
+
+.content-panel li + li {
+  margin-top: 0.35rem;
+}
+
+.content-source {
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.1rem 0.5rem;
+  border-radius: 9999px;
+  background: #ecfdf5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.content-source--cache {
+  background: #eef2ff;
+  color: #312e81;
+  border-color: #c7d2fe;
+}

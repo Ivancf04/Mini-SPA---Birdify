@@ -1,11 +1,40 @@
 import ApiService from "../services/apiService.js";
 import ItemCard from "../components/ItemCard.js";
 import { KEYS, getSession } from "../utils/storage.js";
+import { getBoletin } from "../services/contentService.js";
+
+// Panel del boletín de campo (data/boletin.json → Network First en sw.js)
+function renderBoletin(result) {
+  if (result.status === "rejected") {
+    return `
+      <aside class="card content-panel" aria-label="Boletín de campo">
+        <h3>Boletín de campo</h3>
+        <p>No hay boletín disponible por ahora (sin red y sin copia guardada).</p>
+      </aside>
+    `;
+  }
+  const { data, fuente } = result.value;
+  const esCache = fuente.toLowerCase().includes("cache");
+  const fecha = new Date(data.actualizado).toLocaleString("es-MX");
+  return `
+    <aside class="card content-panel" aria-label="Boletín de campo">
+      <h3>${data.titulo} · edición ${data.edicion}</h3>
+      <p><small>Actualizado: ${fecha}</small>
+        <span class="content-source ${esCache ? "content-source--cache" : ""}">Fuente: ${fuente}</span></p>
+      <ul>
+        ${data.avisos.map((a) => `<li><strong>${a.tipo}:</strong> ${a.texto}</li>`).join("")}
+      </ul>
+    </aside>
+  `;
+}
 
 export default async function HomeView() {
   const service = new ApiService();
   let items = [];
   let errorDetails = null;
+
+  // El boletín se pide en paralelo y no bloquea el catálogo si falla
+  const boletinPromise = Promise.allSettled([getBoletin()]).then(([r]) => r);
 
   // Estado de carga (Loading): Es manejado automáticamente por el Router
   // mediante el skeleton loader en #app mientras se resuelve la función HomeView.
@@ -33,6 +62,15 @@ export default async function HomeView() {
         message: "No fue posible comunicarse con la API de inaturalist.",
         suggestion: "Verifica si estas sin conexion (Offline) o si el navegador bloqueo la peticion por CORS.",
       };
+    } else if (err.status === 503) {
+      // 503 generado por el Service Worker: sin red y sin copia en caché
+      errorDetails = {
+        badge: "Sin conexión",
+        badgeClass: "error-badge--timeout",
+        title: "El catálogo aún no se ha guardado en este dispositivo",
+        message: "No hay red y todavía no existe una copia local de la lista de aves.",
+        suggestion: "Conéctate una vez y Birdify guardará la lista para consultarla sin red.",
+      };
     } else if (err.status) {
       // si el servidor respondio con 404, 500, etc.
       errorDetails = {
@@ -54,10 +92,13 @@ export default async function HomeView() {
     }
   }
 
+  const boletinHtml = renderBoletin(await boletinPromise);
+
   // si fallo muestra la tarjeta de error
   if (errorDetails) {
     return `
       <section class="view-home">
+        ${boletinHtml}
         <h2>Aves Registradas</h2>
         <div class="error-card" role="alert">
           <span class="error-badge ${errorDetails.badgeClass}">${errorDetails.badge}</span>
@@ -80,6 +121,7 @@ export default async function HomeView() {
 
   return `
     <section class="view-home">
+      ${boletinHtml}
       <h2>Aves Registradas (API iNaturalist)</h2>
       <p class="subtitle">Catalogo generado en tiempo real mediante consumo de API REST</p>
       <input
@@ -91,8 +133,8 @@ export default async function HomeView() {
       />
       <div class="grid">
         ${filteredItems.length
-          ? filteredItems.map((item) => ItemCard(item)).join("")
-          : '<p class="no-results">No se encontraron aves con ese nombre.</p>'}
+      ? filteredItems.map((item) => ItemCard(item)).join("")
+      : '<p class="no-results">No se encontraron aves con ese nombre.</p>'}
       </div>
     </section>
   `;

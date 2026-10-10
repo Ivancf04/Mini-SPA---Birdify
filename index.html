@@ -5,16 +5,19 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Birdify — Catálogo de Aves</title>
+  <meta name="description" content="Birdify: catálogo de aves y bitácora de avistamientos que funciona sin conexión." />
+  <!-- Favicon vacío: evita una petición extra a /favicon.ico (404 en línea, 503 sin red) -->
+  <link rel="icon" href="data:," />
 
   <!-- Script para recibir redirección de 404.html en GitHub Pages -->
   <script type="text/javascript">
-    (function(l) {
-      if (l.search[1] === '/' ) {
-        var decoded = l.search.slice(1).split('&').map(function(s) { 
+    (function (l) {
+      if (l.search[1] === '/') {
+        var decoded = l.search.slice(1).split('&').map(function (s) {
           return s.replace(/~and~/g, '&')
         }).join('?');
         window.history.replaceState(null, null,
-            l.pathname.slice(0, -1) + decoded + l.hash
+          l.pathname.slice(0, -1) + decoded + l.hash
         );
       }
     }(window.location))
@@ -45,8 +48,13 @@
       <a href="/avistamientos" data-link>Avistamientos</a>
       <a href="/diagnostico" data-link>Diagnóstico</a>
       <button id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">🌙</button>
+      <!-- Insignia de conectividad (la controla src/pwa/networkStatus.js) -->
+      <span id="network-badge" class="network-badge" role="status" aria-live="polite" hidden></span>
     </nav>
   </header>
+
+  <!-- Franja explicativa cuando no hay red o se sirve una copia guardada -->
+  <div id="network-banner" class="network-banner" role="status" aria-live="polite" hidden></div>
 
   <!--
     contendor raiz única zona que el router modifica.

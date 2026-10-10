@@ -28,6 +28,7 @@ import {
   getCachedUrls,
   deleteCachedUrl,
 } from "./pwa/registerSW.js";
+import { initNetworkStatus } from "./pwa/networkStatus.js";
 
 // Funciones utilitarias expuestas globalmente en la consola de DevTools
 window.deleteCacheEntry = async function (url) {
@@ -347,6 +348,7 @@ document.addEventListener("click", async (event) => {
 
 initTheme();
 trackVisit();
+initNetworkStatus();
 router.init();
 
 // Requisito: Registro del Service Worker al cargar (o inmediato si ya cargó)
