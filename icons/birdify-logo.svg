@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024" role="img" aria-label="Birdify: pájaro posado sobre una rama">
+  <title>Birdify</title>
+  <!-- Fondo a sangre (sin transparencia): requisito del ícono maskable.
+       Color = background del header en styles/shell.css -->
+  <rect width="1024" height="1024" fill="#018547"/>
+
+  <!-- Todo el dibujo está dentro de la safe zone: círculo de radio 410 px centrado en (512,512) -->
+  <g transform="translate(0,-34)">
+    <!-- Rama -->
+    <line x1="300" y1="778" x2="735" y2="778" stroke="#cadcfc" stroke-width="24" stroke-linecap="round"/>
+    <!-- Patas -->
+    <g stroke="#ffffff" stroke-width="16" stroke-linecap="round">
+      <line x1="490" y1="690" x2="490" y2="766"/>
+      <line x1="562" y1="680" x2="562" y2="766"/>
+    </g>
+    <!-- Cola -->
+    <path d="M395 600 L205 735 L300 772 L440 672 Z" fill="#ffffff" stroke="#ffffff" stroke-width="18" stroke-linejoin="round"/>
+    <!-- Cuerpo -->
+    <ellipse cx="520" cy="560" rx="215" ry="150" transform="rotate(-25 520 560)" fill="#ffffff"/>
+    <!-- Cabeza -->
+    <circle cx="640" cy="395" r="92" fill="#ffffff"/>
+    <!-- Pico -->
+    <path d="M722 366 L818 410 L726 436 Z" fill="#cadcfc" stroke="#cadcfc" stroke-width="10" stroke-linejoin="round"/>
+    <!-- Ala -->
+    <path d="M332 575 C400 462 560 470 650 535 C592 640 440 662 332 575 Z" fill="#1e2761"/>
+    <!-- Ojo -->
+    <circle cx="660" cy="384" r="15" fill="#1e2761"/>
+    <circle cx="665" cy="379" r="4.5" fill="#ffffff"/>
+  </g>
+</svg>

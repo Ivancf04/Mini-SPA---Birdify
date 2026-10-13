@@ -1,5 +1,6 @@
 // sw.js — service worker de birdify
 // unidad 3 · ejercicio 4: estrategias de caché por tipo de recurso (offline first)
+// unidad 4 · ejercicio 1: manifest e íconos en el precache (CACHE_VERSION v3)
 
 console.log("[sw.js] service worker corriendo");
 console.log("[sw.js] contexto global (self.constructor.name):", self.constructor.name);
@@ -8,15 +9,8 @@ console.log("[sw.js] typeof document:", typeof document);
 console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
-// ─────────────────────────────────────────────────────────────────────
-// 1. versionado
-// ─────────────────────────────────────────────────────────────────────
-// v1 -> v2: agregamos estrategias por recurso, los json propios y el
-// precache completo (vistas, servicios, utilidades, datos y cdn).
-// todo lo de birdify va en una sola caché por version; activate borra
-// cualquier otra caché "birdify-*" que sea vieja.
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v2";
+const CACHE_VERSION = "v3";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 // origenes externos que ocupa la app
@@ -34,8 +28,7 @@ const INATURALIST_HOME_URL =
 // ─────────────────────────────────────────────────────────────────────
 // 2. precaching
 // ─────────────────────────────────────────────────────────────────────
-// todo lo necesario para arrancar y navegar sin red. si falta uno solo,
-// addAll truena y sigue activa la version anterior.
+// todo lo necesario para arrancar y navegar sin red.
 const PRECACHE_LOCAL = [
   // App Shell
   "./",
@@ -71,12 +64,17 @@ const PRECACHE_LOCAL = [
   // Datos iniciales propios
   "./data/boletin.json",
   "./data/consejos.json",
+  // Web App Manifest e íconos
+  "./manifest.json",
+  "./icons/icon-192.png",
+  "./icons/icon-512.png",
+  "./icons/icon-maskable-512.png",
+  "./icons/apple-touch-icon-180.png",
+  "./icons/favicon-32.png",
 ];
 
 const PRECACHE_EXTERNAL = [IDB_MODULE_URL];
 
-// opcional: si la api no contesta al instalar, no tiramos el install;
-// inicio simplemente se llena luego en vivo con network first.
 const PRECACHE_OPTIONAL = [INATURALIST_HOME_URL];
 
 self.addEventListener("install", (event) => {
@@ -144,8 +142,6 @@ function log(strategy, label, message, url) {
   console.log(`[SW][${strategy}] ${label} → ${message}: ${shortUrl(url)}`);
 }
 
-// algunos servers locales regresan 301 con "./"; respuestas con redirected=true
-// no sirven para una navegacion, asi que armamos una respuesta limpia con 200
 function sanitizeResponse(response) {
   if (!response || !response.redirected) return response;
   return new Response(response.body, {
@@ -155,7 +151,7 @@ function sanitizeResponse(response) {
   });
 }
 
-// marca de donde salio el dato (para saber en la vista si vino de red o de caché)
+
 function withSource(response, source) {
   const headers = new Headers(response.headers);
   headers.set("X-Birdify-Fuente", source);
@@ -166,8 +162,6 @@ function withSource(response, source) {
   });
 }
 
-// solo guardamos respuestas buenas. las opacas (fotos externas sin cors)
-// no dejan ver el status, asi que solo se guardan si viene allowOpaque
 function isCacheable(response, allowOpaque = false) {
   if (!response) return false;
   if (response.ok) return true;
@@ -249,12 +243,6 @@ function offlineFallback(request, label) {
 // 6. ESTRATEGIAS (una función por estrategia)
 // ─────────────────────────────────────────────────────────────────────
 
-/**
- * CACHE FIRST: responde desde caché; solo va a la red si no hay copia y,
- * si la obtiene, la guarda para la próxima vez.
- * options.cacheKey   -> clave alternativa (para el App Shell en navegaciones)
- * options.allowOpaque -> permite guardar respuestas opacas (imágenes externas)
- */
 async function cacheFirst(event, request, label, options = {}) {
   const cache = await caches.open(CACHE_NAME);
   const keys = options.cacheKeys || [request];
@@ -281,10 +269,6 @@ async function cacheFirst(event, request, label, options = {}) {
   }
 }
 
-/**
- * NETWORK FIRST: intenta la red (con timeout para "lie-fi"); si responde
- * bien actualiza la caché. Si la red falla, usa la última copia guardada.
- */
 async function networkFirst(event, request, label, options = {}) {
   const cache = await caches.open(CACHE_NAME);
   const timeoutMs = options.timeoutMs ?? 4000;
@@ -310,10 +294,6 @@ async function networkFirst(event, request, label, options = {}) {
   }
 }
 
-/**
- * STALE-WHILE-REVALIDATE: responde al instante con la copia guardada y, en
- * paralelo, pide la versión nueva a la red para la PRÓXIMA petición.
- */
 async function staleWhileRevalidate(event, request, label, options = {}) {
   const cache = await caches.open(CACHE_NAME);
   const cached = await cache.match(request, { ignoreVary: true });
@@ -348,7 +328,7 @@ async function staleWhileRevalidate(event, request, label, options = {}) {
 // ─────────────────────────────────────────────────────────────────────
 // 7. TABLA DE DECISIÓN LLEVADA A CÓDIGO
 // ─────────────────────────────────────────────────────────────────────
-// Se evalúa en orden; gana la primera regla que coincide.
+
 const SAME_ORIGIN = self.location.origin;
 const SCOPE_PATH = new URL(self.registration.scope).pathname; // "/" o "/Mini-SPA---Birdify/"
 
@@ -398,14 +378,8 @@ const ROUTES = [
   },
 ];
 
-/**
- * Decide qué estrategia usar. Devuelve null cuando el SW NO debe intervenir
- * y la petición sigue su camino normal hacia la red.
- */
 function chooseStrategy(request) {
-  // No se atienden con caché:
-  // - Métodos distintos de GET (POST, PUT, DELETE...): modifican datos y la
-  //   Cache API solo guarda GET; responder desde caché sería incorrecto.
+
   if (request.method !== "GET") return null;
 
   const url = new URL(request.url);
