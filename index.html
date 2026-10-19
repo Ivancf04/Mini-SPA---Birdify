@@ -53,12 +53,27 @@
 
   <!-- app shell que se mantiene en toda la vida de la SPA nunca se reemplaza -->
   <header>
-    <h1>Birdify</h1>
+    <div class="brand-group">
+      <h1>Birdify</h1>
+      <!-- Indicador cuando corre como app instalada (Requisito 5) -->
+      <span id="installed-badge" class="badge-installed" hidden title="Ejecutándose en modo aplicación">⚡ Instalada</span>
+    </div>
     <nav>
       <a href="/" data-link>Inicio</a>
       <a href="/acerca" data-link>Nosotros</a>
       <a href="/avistamientos" data-link>Avistamientos</a>
       <a href="/diagnostico" data-link>Diagnóstico</a>
+      
+      <!-- Botón "Instalar app" en la interfaz fija Shell (Requisito 4) -->
+      <button id="install-btn" class="btn-install" type="button" aria-label="Instalar app" hidden>
+        📲 Instalar app
+      </button>
+
+      <!-- Botón de Plan B para iOS y navegadores sin evento nativo (Requisito 5) -->
+      <button id="install-guide-btn" class="btn-install btn-install--guide" type="button" aria-label="Guía de instalación" hidden>
+        💡 Cómo instalar
+      </button>
+
       <button id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">🌙</button>
       <!-- Insignia de conectividad (la controla src/pwa/networkStatus.js) -->
       <span id="network-badge" class="network-badge" role="status" aria-live="polite" hidden></span>
@@ -81,6 +96,22 @@
       <div class="skeleton-block card"></div>
     </div>
   </main>
+
+  <!-- Modal accesible de Instrucciones de Instalación (Plan B para iOS y navegadores sin beforeinstallprompt) -->
+  <div id="install-modal" class="install-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="install-modal-title">
+    <div class="install-modal-card">
+      <div class="install-modal-header">
+        <h3 id="install-modal-title">Cómo instalar Birdify</h3>
+        <button type="button" id="close-install-modal-btn" class="install-modal-close" aria-label="Cerrar modal">&times;</button>
+      </div>
+      <div id="install-modal-content" class="install-modal-body">
+        <!-- Contenido inyectado dinámicamente -->
+      </div>
+      <div class="install-modal-footer">
+        <button type="button" id="dismiss-install-modal-btn" class="btn-action">Entendido</button>
+      </div>
+    </div>
+  </div>
 
   <!--footer se mantiene en toda la vida de la SPA nunca se reemplaza -->
   <footer>

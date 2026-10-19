@@ -366,11 +366,142 @@ document.addEventListener("click", async (event) => {
       `;
     }
   }
+
+  // Botón "Llamar promptInstall()" en DiagnosticView (Requisito 3 y 4)
+  if (event.target.id === "diag-install-prompt-btn") {
+    try {
+      const res = await promptInstall();
+      alert(`Resultado de la instalación: ${res.outcome}`);
+      router.render(); // Refrescar vista de diagnóstico
+    } catch (err) {
+      alert(`Error al solicitar instalación: ${err.message}`);
+    }
+  }
+
+  // Botón "Ver Guía Plan B" en DiagnosticView (Requisito 5)
+  if (event.target.id === "diag-install-guide-btn") {
+    openInstallGuideModal();
+  }
 });
+
+// Requisito 5: Plan B - Instrucciones específicas para iOS u otros navegadores
+function openInstallGuideModal() {
+  const modal = document.getElementById("install-modal");
+  const content = document.getElementById("install-modal-content");
+  if (!modal || !content) return;
+
+  const isIOS = isIOSDevice();
+  if (isIOS) {
+    content.innerHTML = `
+      <h4>Instalación en iPhone / iPad (Safari)</h4>
+      <p>Apple no emite el evento automático en navegadores, pero puedes agregar Birdify a tu pantalla de inicio fácilmente:</p>
+      <ul class="install-steps">
+        <li class="install-step-item">
+          <span class="install-step-number">1</span>
+          <div class="install-step-text">Toca el botón <strong>Compartir</strong> (icono <span style="font-size:1.15rem">⎋</span> cuadrado con flecha hacia arriba) en la barra de Safari.</div>
+        </li>
+        <li class="install-step-item">
+          <span class="install-step-number">2</span>
+          <div class="install-step-text">Desplázate por el menú y selecciona <strong>"Agregar a pantalla de inicio"</strong> (<span style="font-size:1.15rem">➕</span>).</div>
+        </li>
+        <li class="install-step-item">
+          <span class="install-step-number">3</span>
+          <div class="install-step-text">Pulsa <strong>"Agregar"</strong> en la esquina superior derecha.</div>
+        </li>
+      </ul>
+      <p style="margin-top: 0.75rem; font-size: 0.85rem; color: #64748b;">
+        Birdify se abrirá en su propia ventana, a pantalla completa y con acceso offline garantizado.
+      </p>
+    `;
+  } else {
+    content.innerHTML = `
+      <h4>Instalación en tu navegador</h4>
+      <p>Tu navegador actual no disparó el evento de instalación directa con un clic. Para instalarla o anclarla:</p>
+      <ul class="install-steps">
+        <li class="install-step-item">
+          <span class="install-step-number">1</span>
+          <div class="install-step-text">Abre el menú de opciones de tu navegador (los tres puntos <strong>⋮</strong> o <strong>⋯</strong>).</div>
+        </li>
+        <li class="install-step-item">
+          <span class="install-step-number">2</span>
+          <div class="install-step-text">Busca la opción <strong>"Instalar Birdify"</strong>, <strong>"Instalar aplicación"</strong> o <strong>"Agregar a la pantalla principal"</strong>.</div>
+        </li>
+        <li class="install-step-item">
+          <span class="install-step-number">3</span>
+          <div class="install-step-text">Confirma la instalación para disfrutar de la experiencia en ventana independiente.</div>
+        </li>
+      </ul>
+      <p style="margin-top: 0.75rem; font-size: 0.85rem; color: #64748b;">
+        <em>Nota:</em> Todas las funciones de Birdify (catálogo, avistamientos en IndexedDB y modo sin conexión) funcionan al 100% en este navegador sin bloquear ninguna funcionalidad.
+      </p>
+    `;
+  }
+  modal.hidden = false;
+}
+
+function closeInstallGuideModal() {
+  const modal = document.getElementById("install-modal");
+  if (modal) modal.hidden = true;
+}
+
+// Requisito 4 y 5: Gestión reactiva del botón "Instalar app" en el Shell y Plan B
+function initInstallUI() {
+  const installBtn = document.getElementById("install-btn");
+  const guideBtn = document.getElementById("install-guide-btn");
+  const installedBadge = document.getElementById("installed-badge");
+  const modal = document.getElementById("install-modal");
+
+  onInstallStateChange((state) => {
+    console.log("[main.js] Estado de instalación actualizado:", state);
+    if (state.isStandalone) {
+      // Requisito 4: NO visible cuando la app se está ejecutando instalada
+      if (installBtn) installBtn.hidden = true;
+      if (guideBtn) guideBtn.hidden = true;
+      if (installedBadge) installedBadge.hidden = false;
+    } else {
+      if (installedBadge) installedBadge.hidden = true;
+      if (state.canPrompt) {
+        // Requisito 4: visible SOLO cuando existe el evento guardado y la app no se ejecuta instalada
+        if (installBtn) installBtn.hidden = false;
+        if (guideBtn) guideBtn.hidden = true;
+      } else {
+        if (installBtn) installBtn.hidden = true;
+        // Requisito 5: Si no hay evento y es iOS o navegador sin evento, mostrar guía Plan B
+        if (guideBtn) {
+          guideBtn.hidden = false;
+          guideBtn.innerHTML = state.isIOS ? "📲 Instalar en iOS" : "💡 Cómo instalar";
+        }
+      }
+    }
+  });
+
+  // Requisito 4: Clic en el botón "Instalar app" del Shell
+  installBtn?.addEventListener("click", async () => {
+    try {
+      const choice = await promptInstall();
+      if (choice && choice.outcome === "accepted") {
+        showDbFeedback("¡Gracias por instalar Birdify! Disfruta la aplicación.", false);
+      }
+    } catch (err) {
+      console.error("[main.js] Error al solicitar instalación:", err);
+    }
+  });
+
+  // Requisito 5: Clic en el botón de Plan B / Guía de instalación
+  guideBtn?.addEventListener("click", openInstallGuideModal);
+
+  // Cierre del modal
+  document.getElementById("close-install-modal-btn")?.addEventListener("click", closeInstallGuideModal);
+  document.getElementById("dismiss-install-modal-btn")?.addEventListener("click", closeInstallGuideModal);
+  modal?.addEventListener("click", (e) => {
+    if (e.target === modal) closeInstallGuideModal();
+  });
+}
 
 initTheme();
 trackVisit();
 initNetworkStatus();
+initInstallUI();
 router.init();
 
 // Requisito: Registro del Service Worker al cargar (o inmediato si ya cargó)

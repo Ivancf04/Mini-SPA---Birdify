@@ -6,19 +6,24 @@ import {
   checkRouteInScope,
   getCachedUrls,
 } from "../pwa/registerSW.js";
+import { getInstallDiagnosticState } from "../pwa/installPrompt.js";
 
 /**
  * Vista de diagnóstico:
  * 1. Estado y contexto del Service Worker.
  * 2. Verificador de Scope (al menos 5 rutas).
  * 3. Experimento de Scope inválido a propósito.
- * 4. Mecanismos de persistencia (localStorage, sessionStorage, Cookie).
+ * 4. Diagnóstico de Instalabilidad y Plataforma (PWA).
+ * 5. Mecanismos de persistencia (localStorage, sessionStorage, Cookie).
  */
 export default async function DiagnosticView() {
   // Datos de almacenamiento
   const theme = getLocal(KEYS.THEME);
   const search = getSession(KEYS.HOME_SEARCH);
   const visits = getCookie(KEYS.VISITS_COOKIE);
+
+  // Datos en vivo de instalabilidad PWA
+  const installState = getInstallDiagnosticState();
 
   // Datos en vivo del Service Worker
   const swData = await getSWDiagnosticData();
@@ -230,7 +235,67 @@ export default async function DiagnosticView() {
       </div>
 
 
-      <!-- 4. Diagnóstico de Almacenamiento (Persistencia previa) -->
+      <!-- 4. Instalabilidad y Plataforma PWA (Requisitos 4 y 5) -->
+      <div class="card diagnostic-panel">
+        <div class="diagnostic-panel-header">
+          <h2>Instalabilidad y Plataforma PWA</h2>
+          <span class="badge-status ${installState.isStandalone ? "badge-state-activated" : "badge-state-installing"}">
+            ${installState.isStandalone ? "STANDALONE (INSTALADA)" : "MODO NAVEGADOR"}
+          </span>
+        </div>
+        <p class="subtitle">Detección de modo de ejecución (display-mode y standalone), captura de evento y Plan B.</p>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>¿La app corre instalada (standalone)?</strong>
+            <p class="diagnostic-value ${installState.isStandalone ? "badge-success" : "badge-warning"}">
+              ${installState.isStandalone ? "Sí — Ejecutándose en ventana propia sin barra de direcciones" : "No — Ejecutándose dentro de la pestaña del navegador"}
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Método de comprobación del modo instalado:</strong>
+            <p>
+              <code>matchMedia('(display-mode: standalone)'): ${window.matchMedia("(display-mode: standalone)").matches ? "true" : "false"}</code><br/>
+              <code>navigator.standalone (iOS Safari): ${window.navigator.standalone === true ? "true" : "false"}</code>
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Evento beforeinstallprompt disponible:</strong>
+            <p class="diagnostic-value ${installState.canPrompt ? "badge-success" : "badge-warning"}">
+              ${installState.canPrompt ? "Sí — Evento diferido capturado y listo para invocar" : "No — No emitido por el navegador o ya consumido"}
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Dispositivo iOS / iPadOS detectado:</strong>
+            <p>${installState.isIOS ? "Sí (Plan B activo: Instrucciones de Safari Compartir → Pantalla de inicio)" : "No (Chromium o navegador de escritorio estándar)"}</p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Acción de prueba de instalación:</strong>
+            <p class="subtitle" style="margin: 0.25rem 0 0.5rem 0;">Prueba el prompt nativo o abre la guía del Plan B según la disponibilidad.</p>
+          </div>
+          <div>
+            ${
+              installState.canPrompt
+                ? `<button id="diag-install-prompt-btn" type="button" class="btn-action">Llamar promptInstall()</button>`
+                : `<button id="diag-install-guide-btn" type="button" class="btn-clear">Ver Guía Plan B</button>`
+            }
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Diagnóstico de Almacenamiento (Persistencia previa) -->
       <div class="card diagnostic-panel">
         <h2>Diagnóstico de almacenamiento</h2>
         <p class="subtitle">Valores actuales guardados en el cliente (Ejercicio 3 — Persistencia).</p>
