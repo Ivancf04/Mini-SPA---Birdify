@@ -29,6 +29,18 @@ import {
   deleteCachedUrl,
 } from "./pwa/registerSW.js";
 import { initNetworkStatus } from "./pwa/networkStatus.js";
+import {
+  initInstallPrompt,
+  promptInstall,
+  isInstallPromptAvailable,
+  isRunningStandalone,
+  isIOSDevice,
+  getInstallDiagnosticState,
+  onInstallStateChange,
+} from "./pwa/installPrompt.js";
+
+// Requisito 3: El módulo debe iniciarse al arrancar la app, no al abrir una vista
+initInstallPrompt();
 
 // Funciones utilitarias expuestas globalmente en la consola de DevTools
 window.deleteCacheEntry = async function (url) {
@@ -53,6 +65,16 @@ window.checkSW = async function () {
   console.log("=== DIAGNÓSTICO DEL SERVICE WORKER ===");
   console.table(data);
   return data;
+};
+
+// Requisito 3: Función global que llama a prompt() y devuelve lo que el usuario eligió
+window.promptInstall = promptInstall;
+window.pwaInstall = {
+  prompt: promptInstall,
+  isAvailable: isInstallPromptAvailable,
+  isStandalone: isRunningStandalone,
+  isIOS: isIOSDevice,
+  getState: getInstallDiagnosticState,
 };
 // Función utilitaria para mostrar alertas visuales al usuario
 function showDbFeedback(message, isError = false) {
