@@ -1,6 +1,7 @@
 // sw.js — service worker de birdify
 // unidad 3 · ejercicio 4: estrategias de caché por tipo de recurso (offline first)
 // unidad 4 · ejercicio 1: manifest e íconos en el precache (CACHE_VERSION v3)
+// unidad 4 · ejercicio 2: captura de instalación PWA y Plan B (CACHE_VERSION v4)
 
 console.log("[sw.js] service worker corriendo");
 console.log("[sw.js] contexto global (self.constructor.name):", self.constructor.name);
@@ -10,7 +11,7 @@ console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v3";
+const CACHE_VERSION = "v4";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 // origenes externos que ocupa la app
@@ -45,6 +46,7 @@ const PRECACHE_LOCAL = [
   "./src/router/router.js",
   "./src/pwa/registerSW.js",
   "./src/pwa/networkStatus.js",
+  "./src/pwa/installPrompt.js",
   // Vistas (NotFoundView e ItemDetailView -> apiService se cargan con import())
   "./src/views/HomeView.js",
   "./src/views/AboutView.js",
