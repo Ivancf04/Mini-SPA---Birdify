@@ -3,15 +3,59 @@
   "short_name": "Birdify",
   "description": "Registra y consulta tus avistamientos de aves, también sin conexión.",
   "lang": "es",
-  "id": "/Mini-SPA---Birdify/",
-  "start_url": "/Mini-SPA---Birdify/",
-  "scope": "/Mini-SPA---Birdify/",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "display_override": ["standalone", "minimal-ui", "browser"],
+  "orientation": "any",
   "theme_color": "#018547",
   "background_color": "#f7f8fb",
   "icons": [
-    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icons/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "categories": ["education", "nature", "utilities"],
+  "shortcuts": [
+    {
+      "name": "Avistamientos",
+      "short_name": "Avistamientos",
+      "description": "Registra y consulta tus avistamientos locales",
+      "url": "./avistamientos",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Diagnóstico PWA",
+      "short_name": "Diagnóstico",
+      "description": "Inspecciona el estado de la PWA y Service Worker",
+      "url": "./diagnostico",
+      "icons": [
+        {
+          "src": "icons/icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
   ]
-}
+}
