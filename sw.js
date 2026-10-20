@@ -11,7 +11,7 @@ console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v4";
+const CACHE_VERSION = "v5";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 // origenes externos que ocupa la app
@@ -66,13 +66,15 @@ const PRECACHE_LOCAL = [
   // Datos iniciales propios
   "./data/boletin.json",
   "./data/consejos.json",
-  // Web App Manifest e íconos
+  // Web App Manifest, íconos y capturas Richer Install UI
   "./manifest.json",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/icon-maskable-512.png",
   "./icons/apple-touch-icon-180.png",
   "./icons/favicon-32.png",
+  "./screenshots/screenshot-desktop.png",
+  "./screenshots/screenshot-mobile.png",
 ];
 
 const PRECACHE_EXTERNAL = [IDB_MODULE_URL];

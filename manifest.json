@@ -32,6 +32,22 @@
     }
   ],
   "categories": ["education", "nature", "utilities"],
+  "screenshots": [
+    {
+      "src": "screenshots/screenshot-desktop.png",
+      "sizes": "1376x768",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Birdify en escritorio"
+    },
+    {
+      "src": "screenshots/screenshot-mobile.png",
+      "sizes": "768x1376",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Birdify en móvil"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Avistamientos",
