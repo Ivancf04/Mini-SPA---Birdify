@@ -7,14 +7,25 @@ import {
   getCachedUrls,
 } from "../pwa/registerSW.js";
 import { getInstallDiagnosticState } from "../pwa/installPrompt.js";
+import { getAllOutbox, getOutboxCount } from "../services/dbService.js";
+import {
+  isNativeBackgroundSyncSupported,
+  isBackgroundSyncActive,
+  isPlanBForced,
+  getSyncModeLabel,
+  getApiEndpoint,
+  SYNC_TAG,
+} from "../services/syncService.js";
 
 /**
  * Vista de diagnóstico:
  * 1. Estado y contexto del Service Worker.
  * 2. Verificador de Scope (al menos 5 rutas).
  * 3. Experimento de Scope inválido a propósito.
- * 4. Diagnóstico de Instalabilidad y Plataforma (PWA).
- * 5. Mecanismos de persistencia (localStorage, sessionStorage, Cookie).
+ * 4. Gestión de Cache Storage (Cache API).
+ * 5. Instalabilidad y Plataforma PWA.
+ * 6. Sincronización Offline-First y Background Sync (Cola outbox y Plan B).
+ * 7. Mecanismos de persistencia (localStorage, sessionStorage, Cookie).
  */
 export default async function DiagnosticView() {
   // Datos de almacenamiento
@@ -31,12 +42,21 @@ export default async function DiagnosticView() {
   // Entradas actuales en Cache Storage
   const cachedEntries = await getCachedUrls();
 
-  // Definicion de las 5 rutas minimas requeridas para la verificacion de scope:
-  // 1. La raiz del proyecto
-  // 2. Una ruta del router
-  // 3. Un archivo interno
-  // 4. La raiz sin diagonal final
-  // 5. Una ruta fuera del proyecto
+  // Datos de sincronización offline-first
+  let outboxItems = [];
+  try {
+    outboxItems = await getAllOutbox();
+  } catch (err) {
+    console.error("Error al obtener cola outbox en diagnóstico:", err);
+  }
+
+  const nativeSyncSupported = isNativeBackgroundSyncSupported();
+  const planBForced = isPlanBForced();
+  const bgSyncActive = isBackgroundSyncActive();
+  const currentModeLabel = getSyncModeLabel();
+  const apiEndpoint = getApiEndpoint();
+
+  // Definicion de las 5 rutas minimas requeridas para la verificacion de scope
   const testRoutes = [
     {
       label: "La raiz del proyecto",
@@ -131,6 +151,124 @@ export default async function DiagnosticView() {
         </div>
       </div>
 
+      <!-- 6. Sincronización Offline-First y Background Sync (Requisitos 4 y 5) -->
+      <div class="card diagnostic-panel">
+        <div class="diagnostic-panel-header">
+          <h2>Sincronización Offline-First & Background Sync</h2>
+          <span class="badge-status ${bgSyncActive ? "badge-state-activated" : "badge-state-installing"}">
+            ${bgSyncActive ? "BACKGROUND SYNC ACTIVO" : "PLAN B ACTIVO"}
+          </span>
+        </div>
+        <p class="subtitle">Inspección de la cola Outbox en IndexedDB, tag de Background Sync y modo de sincronización.</p>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Soporte nativo de Background Sync ('SyncManager' in window):</strong>
+            <p class="diagnostic-value ${nativeSyncSupported ? "badge-success" : "badge-warning"}">
+              ${nativeSyncSupported ? "Sí — Soportado por este navegador (Chromium/Edge)" : "No — No soportado (Safari / Firefox). Se usará Plan B."}
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Tag propia registrada:</strong>
+            <p><code>${SYNC_TAG}</code></p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Modo actual de sincronización:</strong>
+            <p class="diagnostic-value ${bgSyncActive ? "badge-success" : "badge-warning"}">
+              ${currentModeLabel}
+            </p>
+          </div>
+        </div>
+
+        <!-- Simulación reversible de Plan B (Requisito 5) -->
+        <div class="diagnostic-row">
+          <div>
+            <strong>Simulación reversible: Forzar modo sin Background Sync</strong>
+            <p class="subtitle" style="margin: 0.25rem 0;">
+              Desactiva centralizadamente todas las rutas que registrarían Background Sync sin modificar APIs globales.
+              Estado actual: <strong>${planBForced ? "FORZADO (Plan B activo)" : "NORMAL (Automático)"}</strong>.
+            </p>
+          </div>
+          <div>
+            ${
+              planBForced
+                ? `<button id="btn-toggle-planb-force" type="button" class="btn-action">Restaurar Automático</button>`
+                : `<button id="btn-toggle-planb-force" type="button" class="btn-warning">Simular Falta de Soporte (Plan B)</button>`
+            }
+          </div>
+        </div>
+
+        <!-- Endpoint del backend y prueba de conectividad -->
+        <div class="diagnostic-row">
+          <div style="flex: 1;">
+            <strong>Endpoint del servidor de avistamientos:</strong>
+            <p class="subtitle" style="margin: 0.25rem 0;">Configura la URL real del backend receptor.</p>
+            <input type="text" id="diag-backend-endpoint-input" value="${apiEndpoint}" style="width: 100%; max-width: 400px; padding: 0.4rem; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem;" />
+          </div>
+          <div style="display: flex; gap: 0.5rem; align-items: flex-end;">
+            <button id="btn-save-endpoint" type="button" class="btn-action">Guardar URL</button>
+            <button id="btn-ping-backend" type="button" class="btn-clear">Probar Ping</button>
+          </div>
+        </div>
+        <div id="backend-ping-feedback" class="feedback-box" style="display: none; margin-top: 0.5rem;"></div>
+
+        <!-- Inspección de la Cola Outbox -->
+        <div style="margin-top: 1.5rem;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+            <strong>Cola de Operaciones Pendientes (Store 'outbox'): ${outboxItems.length} elementos</strong>
+            <div style="display: flex; gap: 0.5rem;">
+              <button id="btn-diag-process-planb" type="button" class="btn-action" title="Procesar cola manualmente ahora">
+                🔄 Procesar Cola (Plan B)
+              </button>
+              <button id="btn-diag-clear-server" type="button" class="btn-warning" title="Limpiar avistamientos en el servidor para reiniciar pruebas">
+                🗑️ Limpiar Servidor
+              </button>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="scope-table">
+              <thead>
+                <tr>
+                  <th>ClientRequestId (Op)</th>
+                  <th>Ave / Hábitat</th>
+                  <th>Fecha de creación</th>
+                  <th>Estado</th>
+                  <th>Intentos</th>
+                  <th>Último error</th>
+                </tr>
+              </thead>
+              <tbody id="outbox-table-body">
+                ${
+                  outboxItems.length === 0
+                    ? `<tr><td colspan="6" style="text-align: center; color: #6b7280;">No hay operaciones pendientes en la cola outbox.</td></tr>`
+                    : outboxItems
+                        .map(
+                          (item) => `
+                      <tr>
+                        <td><code>${item.clientRequestId.slice(0, 12)}…</code></td>
+                        <td><strong>${item.payload?.birdName || "N/A"}</strong> (${item.payload?.category || ""})</td>
+                        <td><small>${new Date(item.createdAt).toLocaleTimeString()}</small></td>
+                        <td><span class="badge ${item.status === "failed" ? "badge-scope-out" : "badge-scope-in"}">${item.status}</span></td>
+                        <td style="text-align: center;">${item.attempts || 0}</td>
+                        <td><small style="color: #ef4444;">${item.lastError || "Ninguno"}</small></td>
+                      </tr>
+                    `
+                        )
+                        .join("")
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- 2. Verificador de Scope -->
       <div class="card diagnostic-panel">
         <h2>Verificador de Scope</h2>
@@ -185,7 +323,7 @@ export default async function DiagnosticView() {
         <div id="invalid-scope-feedback" class="feedback-box" style="display: none;"></div>
       </div>
 
-            <!-- 5. Herramienta de depuracion: Gestion de Cache Storage (Cache API) -->
+      <!-- 4. Herramienta de depuracion: Gestion de Cache Storage (Cache API) -->
       <div class="card diagnostic-panel">
         <div class="diagnostic-panel-header">
           <h2>Gestion de Cache Storage (Cache API)</h2>
@@ -234,8 +372,7 @@ export default async function DiagnosticView() {
         </div>
       </div>
 
-
-      <!-- 4. Instalabilidad y Plataforma PWA (Requisitos 4 y 5) -->
+      <!-- 5. Instalabilidad y Plataforma PWA (Requisitos 4 y 5) -->
       <div class="card diagnostic-panel">
         <div class="diagnostic-panel-header">
           <h2>Instalabilidad y Plataforma PWA</h2>
@@ -295,7 +432,7 @@ export default async function DiagnosticView() {
         </div>
       </div>
 
-      <!-- 5. Diagnóstico de Almacenamiento (Persistencia previa) -->
+      <!-- 7. Diagnóstico de Almacenamiento (Persistencia previa) -->
       <div class="card diagnostic-panel">
         <h2>Diagnóstico de almacenamiento</h2>
         <p class="subtitle">Valores actuales guardados en el cliente (Ejercicio 3 — Persistencia).</p>

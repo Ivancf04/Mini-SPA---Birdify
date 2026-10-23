@@ -11,7 +11,7 @@ console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v5";
+const CACHE_VERSION = "v6";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 // origenes externos que ocupa la app
@@ -60,6 +60,7 @@ const PRECACHE_LOCAL = [
   "./src/services/apiService.js",
   "./src/services/dbService.js",
   "./src/services/contentService.js",
+  "./src/services/syncService.js",
   // Utilidades
   "./src/utils/slugify.js",
   "./src/utils/storage.js",
@@ -404,4 +405,225 @@ self.addEventListener("fetch", (event) => {
   const route = chooseStrategy(event.request);
   if (!route) return; // el navegador la resuelve sin pasar por la caché
   event.respondWith(route.handler(event, event.request, route.label));
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 9. BACKGROUND SYNC (TAG: birdify-sync-sightings)
+// ─────────────────────────────────────────────────────────────────────
+
+const SYNC_TAG_NAME = "birdify-sync-sightings";
+let configuredBackendEndpoint = "http://localhost:3000/api/sightings";
+
+// Permitir actualizar la URL del backend desde mensajes de la app
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "BIRDIFY_SET_BACKEND_ENDPOINT" && event.data.endpoint) {
+    configuredBackendEndpoint = event.data.endpoint;
+    console.log("[SW] Endpoint de backend configurado:", configuredBackendEndpoint);
+  }
+});
+
+/**
+ * Acceso directo a IndexedDB (BirdifyDB) en contexto de Service Worker clásico.
+ * Totalmente compatible sin dependencias externas, sin imports estáticos y sin window/document/localStorage.
+ */
+function swOpenDB() {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open("BirdifyDB", 2);
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => resolve(request.result);
+    request.onupgradeneeded = (event) => {
+      const db = event.target.result;
+      if (!db.objectStoreNames.contains("sightings")) {
+        const s = db.createObjectStore("sightings", { keyPath: "id", autoIncrement: true });
+        s.createIndex("by_category", "category", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("outbox")) {
+        const ob = db.createObjectStore("outbox", { keyPath: "clientRequestId" });
+        ob.createIndex("by_status", "status", { unique: false });
+        ob.createIndex("by_createdAt", "createdAt", { unique: false });
+      }
+    };
+  });
+}
+
+function swGetAllOutbox() {
+  return swOpenDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction("outbox", "readonly");
+      const store = tx.objectStore("outbox");
+      const req = store.getAll();
+      req.onsuccess = () => resolve(req.result || []);
+      req.onerror = () => reject(req.error);
+    });
+  });
+}
+
+function swMarkSightingAsSynced(clientRequestId, serverResponse) {
+  return swOpenDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(["sightings", "outbox"], "readwrite");
+      const sightingsStore = tx.objectStore("sightings");
+      const outboxStore = tx.objectStore("outbox");
+
+      outboxStore.delete(clientRequestId);
+
+      const getReq = sightingsStore.getAll();
+      getReq.onsuccess = () => {
+        const list = getReq.result || [];
+        const target = list.find((s) => s.clientRequestId === clientRequestId);
+        if (target) {
+          target.syncStatus = "synced";
+          target.serverConfirmed = true;
+          target.syncError = null;
+          target.syncedAt = new Date().toISOString();
+          if (serverResponse?.sighting?.serverId) {
+            target.serverId = serverResponse.sighting.serverId;
+          }
+          sightingsStore.put(target);
+        }
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  });
+}
+
+function swUpdateOutboxAttempt(clientRequestId, errorMessage) {
+  return swOpenDB().then((db) => {
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(["sightings", "outbox"], "readwrite");
+      const sightingsStore = tx.objectStore("sightings");
+      const outboxStore = tx.objectStore("outbox");
+
+      const getOutbox = outboxStore.get(clientRequestId);
+      getOutbox.onsuccess = () => {
+        const item = getOutbox.result;
+        if (item) {
+          item.attempts = (item.attempts || 0) + 1;
+          item.lastError = errorMessage;
+          item.status = "failed";
+          item.lastAttemptAt = new Date().toISOString();
+          outboxStore.put(item);
+        }
+      };
+
+      const getSightings = sightingsStore.getAll();
+      getSightings.onsuccess = () => {
+        const list = getSightings.result || [];
+        const target = list.find((s) => s.clientRequestId === clientRequestId);
+        if (target) {
+          target.syncStatus = "failed";
+          target.syncError = errorMessage;
+          sightingsStore.put(target);
+        }
+      };
+
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  });
+}
+
+/**
+ * Procesa la cola outbox durante el evento Background Sync
+ */
+async function processOutboxQueueInSW() {
+  console.log("[SW] Iniciando procesamiento de outbox desde Background Sync...");
+  const items = await swGetAllOutbox();
+  if (!items || items.length === 0) {
+    console.log("[SW] outbox vacío, nada que sincronizar.");
+    return;
+  }
+
+  const endpoint = configuredBackendEndpoint;
+  let failedCount = 0;
+  let lastFatalError = null;
+
+  for (const item of items) {
+    try {
+      console.log(`[SW] Enviando avistamiento ${item.clientRequestId} a ${endpoint}`);
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Client-Request-Id": item.clientRequestId,
+        },
+        body: JSON.stringify(item.payload),
+      });
+
+      let data = null;
+      try {
+        data = await response.json();
+      } catch { }
+
+      if (!response.ok) {
+        const errorMsg = data?.error || `HTTP ${response.status}: ${response.statusText || "Error en servidor"}`;
+        console.warn(`[SW] Respuesta de error del servidor para ${item.clientRequestId}:`, errorMsg);
+        await swUpdateOutboxAttempt(item.clientRequestId, errorMsg);
+        failedCount++;
+        lastFatalError = new Error(errorMsg);
+        await notifyClients({
+          type: "BIRDIFY_SYNC_ITEM_ERROR",
+          clientRequestId: item.clientRequestId,
+          error: errorMsg,
+        });
+        continue;
+      }
+
+      // Confirmado por el servidor
+      console.log(`[SW] Avistamiento confirmado por servidor: ${item.clientRequestId}`, data);
+      await swMarkSightingAsSynced(item.clientRequestId, data);
+      await notifyClients({
+        type: "BIRDIFY_SYNC_ITEM_SUCCESS",
+        clientRequestId: item.clientRequestId,
+        sighting: data.sighting,
+      });
+    } catch (networkError) {
+      console.error(`[SW] Fallo de red/conexión al sincronizar ${item.clientRequestId}:`, networkError);
+      await swUpdateOutboxAttempt(item.clientRequestId, networkError.message);
+      failedCount++;
+      lastFatalError = networkError;
+      await notifyClients({
+        type: "BIRDIFY_SYNC_ITEM_ERROR",
+        clientRequestId: item.clientRequestId,
+        error: networkError.message,
+      });
+    }
+  }
+
+  // Notificar estado final a ventanas
+  await notifyClients({
+    type: "BIRDIFY_SYNC_BATCH_FINISHED",
+    total: items.length,
+    failed: failedCount,
+    synced: items.length - failedCount,
+  });
+
+  // Requisito 4: PROPAGAR RECHAZO HASTA waitUntil
+  // Los reintentos del navegador ante rechazo en waitUntil no son inmediatos ni ilimitados.
+  // Errores permanentes (ej. datos inválidos) requieren corrección del usuario.
+  if (failedCount > 0) {
+    console.warn(
+      `[SW] Sync finalizado con ${failedCount} fallos. Propagando rechazo a waitUntil para programar reintento del navegador.`
+    );
+    throw (
+      lastFatalError ||
+      new Error(`[SW] Background Sync no pudo sincronizar ${failedCount} de ${items.length} operaciones.`)
+    );
+  }
+
+  console.log(`[SW] Background Sync completado exitosamente (${items.length} operaciones sincronizadas).`);
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// EVENTO SYNC
+// ─────────────────────────────────────────────────────────────────────
+self.addEventListener("sync", (event) => {
+  if (event.tag === SYNC_TAG_NAME) {
+    // Requisito 4: Imprime "[SW] sync" junto con la tag
+    console.log("[SW] sync", event.tag);
+    // Pasa a event.waitUntil la promesa que procesa la cola
+    event.waitUntil(processOutboxQueueInSW());
+  }
 });

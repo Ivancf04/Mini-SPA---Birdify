@@ -16,10 +16,25 @@ import {
   removeSession } from "./utils/storage.js";
 import {
   saveSighting,
+  saveSightingWithOutbox,
   getAllSightings,
   getSightingsByCategory,
   deleteSighting,
+  getOutboxCount,
+  getAllOutbox,
 } from "./services/dbService.js";
+import {
+  initSyncCoordinator,
+  scheduleOrTriggerSync,
+  processOutboxQueuePlanB,
+  isBackgroundSyncActive,
+  getSyncModeLabel,
+  isPlanBForced,
+  setForcePlanB,
+  getApiEndpoint,
+  setApiEndpoint,
+  SYNC_TAG,
+} from "./services/syncService.js";
 import { renderSightingsList } from "./views/SightingsView.js";
 import {
   registerServiceWorker,
@@ -41,8 +56,20 @@ import {
 
 // Requisito 3: El módulo debe iniciarse al arrancar la app, no al abrir una vista
 initInstallPrompt();
+// Inicializar coordinador centralizado de Background Sync y Plan B (Requisitos 4 y 5)
+initSyncCoordinator();
 
 // Funciones utilitarias expuestas globalmente en la consola de DevTools
+window.birdifySync = {
+  scheduleOrTrigger: scheduleOrTriggerSync,
+  processPlanB: processOutboxQueuePlanB,
+  setForcePlanB,
+  isPlanBForced,
+  getOutboxCount,
+  getAllOutbox,
+  getEndpoint: getApiEndpoint,
+  setEndpoint: setApiEndpoint,
+};
 window.deleteCacheEntry = async function (url) {
   const ok = await deleteCachedUrl(url);
   console.log(`[Cache Delete] Eliminación de '${url}': ${ok ? "EXITOSA" : "FALLIDA / NO ENCONTRADA"}`);
@@ -77,44 +104,118 @@ window.pwaInstall = {
   getState: getInstallDiagnosticState,
 };
 // Función utilitaria para mostrar alertas visuales al usuario
-function showDbFeedback(message, isError = false) {
+function showDbFeedback(message, isError = false, durationMs = 5000) {
   const banner = document.getElementById("db-feedback");
   if (!banner) return;
   banner.textContent = message;
   banner.className = `feedback-banner ${isError ? "feedback-banner--error" : "feedback-banner--success"}`;
   banner.style.display = "block";
-  setTimeout(() => {
+  if (banner._hideTimeout) clearTimeout(banner._hideTimeout);
+  banner._hideTimeout = setTimeout(() => {
     banner.style.display = "none";
-  }, 4000);
+  }, durationMs);
 }
-// 1. Guardar nuevo registro (con try / catch y feedback visual)
+
+// Función auxiliar para actualizar la barra de estado de sincronización y pendientes
+async function updateSyncToolbar() {
+  const countBadge = document.getElementById("pending-count-badge");
+  const modeBadge = document.getElementById("sync-mode-badge");
+
+  if (countBadge) {
+    try {
+      const count = await getOutboxCount();
+      countBadge.textContent = `${count} pendientes`;
+      if (count > 0) {
+        countBadge.classList.add("badge-pending-count--has");
+      } else {
+        countBadge.classList.remove("badge-pending-count--has");
+      }
+    } catch (err) {
+      console.warn("[main.js] Error al consultar outbox count:", err);
+    }
+  }
+
+  if (modeBadge) {
+    const isBg = isBackgroundSyncActive();
+    modeBadge.textContent = isBg
+      ? "⚡ Modo Background Sync"
+      : "🔄 Modo compatible: reintentos al abrir, recuperar conexión o pulsar el botón";
+    modeBadge.className = `sync-mode-badge ${
+      isBg ? "sync-mode-badge--bgsync" : "sync-mode-badge--compatible"
+    }`;
+  }
+}
+
+// 1. Flujo Offline-First del Formulario: Guardar primero en IndexedDB + Outbox, luego sincronizar
 document.addEventListener("submit", async (event) => {
   if (event.target.id !== "sighting-form") return;
   event.preventDefault();
   const form = event.target;
   const formData = new FormData(form);
-  const sighting = {
-    birdName: formData.get("birdName").trim(),
-    location: formData.get("location").trim(),
-    category: formData.get("category"),
-    date: formData.get("date"),
-    notes: formData.get("notes").trim(),
-    createdAt: new Date().toISOString(),
+
+  // a) Validar los datos
+  const birdName = (formData.get("birdName") || "").trim();
+  const location = (formData.get("location") || "").trim();
+  const category = (formData.get("category") || "").trim();
+  const date = (formData.get("date") || "").trim();
+  const notes = (formData.get("notes") || "").trim();
+
+  if (!birdName || !location || !category || !date) {
+    showDbFeedback("Por favor completa los campos obligatorios (*).", true);
+    return;
+  }
+
+  const sightingData = {
+    birdName,
+    location,
+    category,
+    date,
+    notes,
   };
+
   try {
-    // Operación de escritura en IndexedDB
-    await saveSighting(sighting);
-    showDbFeedback("¡Avistamiento guardado exitosamente en IndexedDB!", false);
+    // b & c) Guardar localmente y encolar en outbox en una sola transacción atómica, esperando su conclusión
+    const result = await saveSightingWithOutbox(sightingData);
+
+    // d) Actualizar la interfaz de inmediato (refleja 'pendiente' en IndexedDB)
     form.reset();
-    document.getElementById("bird-date").value = new Date().toISOString().split("T")[0];
-    // Refrescar la lista de registros
+    const dateInput = document.getElementById("bird-date");
+    if (dateInput) dateInput.value = new Date().toISOString().split("T")[0];
+
     const filterSelect = document.getElementById("filter-category");
     const currentFilter = filterSelect ? filterSelect.value : "ALL";
     await refreshSightingsList(currentFilter);
+    await updateSyncToolbar();
+
+    // Mensaje diferenciado: Guardado localmente en el dispositivo
+    showDbFeedback(
+      `📱 Guardado en el dispositivo (IndexedDB). Operación en cola [${result.clientRequestId.slice(0, 8)}…].`,
+      false
+    );
+
+    // e) Solo después intentar enviar o programar la sincronización
+    console.log("[main.js] Guardado local concluido. Programando sincronización...");
+    const syncResult = await scheduleOrTriggerSync();
+
+    if (syncResult && syncResult.mode === "background-sync") {
+      console.log("[main.js] Background Sync registrado con el navegador.");
+    } else if (syncResult && syncResult.synced > 0) {
+      showDbFeedback(
+        `☁️ ¡Envío confirmado por el servidor para "${birdName}"!`,
+        false
+      );
+      await refreshSightingsList(currentFilter);
+      await updateSyncToolbar();
+    } else if (syncResult && syncResult.failed > 0) {
+      await refreshSightingsList(currentFilter);
+      await updateSyncToolbar();
+    }
   } catch (error) {
-    // Requisito 3: Manejo de errores con feedback visible
     console.error("Fallo al guardar en IndexedDB:", error);
-    showDbFeedback(`Error al guardar el avistamiento: ${error.message || "Fallo en la base de datos local."}`, true);
+    showDbFeedback(
+      `Error al guardar en el dispositivo: ${error.message || "Fallo en la base de datos local."}`,
+      true
+    );
   }
 });
 // 2. Filtrar registros usando el Índice de IndexedDB
@@ -169,6 +270,124 @@ document.addEventListener("click", async (event) => {
     } catch (error) {
       console.error("Error al eliminar de IndexedDB:", error);
       showDbFeedback("No se pudo eliminar el registro.", true);
+    }
+    await updateSyncToolbar();
+  }
+
+  // Botón "Reintentar ahora" en SightingsView (Requisitos 3, 4 y 5)
+  if (event.target.id === "btn-retry-sync") {
+    const btn = event.target;
+    btn.disabled = true;
+    btn.textContent = "⏳ Sincronizando...";
+
+    try {
+      // Intenta registrar Background Sync o ejecuta el Plan B
+      const syncResult = await scheduleOrTriggerSync();
+
+      if (syncResult && syncResult.mode === "background-sync") {
+        showDbFeedback("⚡ Background Sync registrado con el navegador. Procesando cola...", false);
+      } else {
+        const results = await processOutboxQueuePlanB("btn-retry-sync-click");
+        if (results && results.synced > 0) {
+          showDbFeedback(`☁️ Envío confirmado por el servidor: ${results.synced} avistamiento(s) sincronizado(s).`, false);
+        } else if (results && results.failed > 0) {
+          showDbFeedback(`⚠️ Se detectaron ${results.failed} fallo(s) al enviar. Revisa el estado de la bitácora.`, true);
+        } else if (results && results.total === 0) {
+          showDbFeedback("No hay operaciones pendientes en la cola outbox.", false);
+        }
+      }
+    } catch (err) {
+      console.error("[main.js] Error al reintentar sincronización:", err);
+      showDbFeedback(`Error en reintento: ${err.message}`, true);
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "🔄 Reintentar ahora";
+      const filterSelect = document.getElementById("filter-category");
+      await refreshSightingsList(filterSelect ? filterSelect.value : "ALL");
+      await updateSyncToolbar();
+    }
+  }
+
+  // Botón "Simular Falta de Soporte / Restaurar Automático" en DiagnosticView (Requisito 5)
+  if (event.target.id === "btn-toggle-planb-force") {
+    const nextForced = !isPlanBForced();
+    setForcePlanB(nextForced);
+    alert(
+      nextForced
+        ? "Modo Plan B forzado activo. Se simula falta de Background Sync sin alterar APIs globales del navegador."
+        : "Modo automático restaurado. Background Sync se utilizará si el navegador lo soporta."
+    );
+    router.render(); // Refrescar vista de diagnóstico
+  }
+
+  // Botón "Guardar URL" del backend en DiagnosticView
+  if (event.target.id === "btn-save-endpoint") {
+    const input = document.getElementById("diag-backend-endpoint-input");
+    if (input) {
+      const newUrl = input.value.trim();
+      setApiEndpoint(newUrl);
+      // Notificar al SW activo si existe
+      if (navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: "BIRDIFY_SET_BACKEND_ENDPOINT",
+          endpoint: newUrl,
+        });
+      }
+      alert(`Endpoint actualizado a: ${newUrl}`);
+      router.render();
+    }
+  }
+
+  // Botón "Probar Ping" al backend en DiagnosticView
+  if (event.target.id === "btn-ping-backend") {
+    const feedbackEl = document.getElementById("backend-ping-feedback");
+    if (!feedbackEl) return;
+    feedbackEl.style.display = "block";
+    feedbackEl.className = "feedback-box";
+    feedbackEl.innerHTML = "Verificando conexión con el servidor backend...";
+
+    try {
+      const endpoint = getApiEndpoint();
+      const baseApiUrl = endpoint.replace(/\/sightings\/?$/, "");
+      const healthUrl = `${baseApiUrl}/health`;
+
+      const res = await fetch(healthUrl, { method: "GET" });
+      const data = await res.json();
+
+      feedbackEl.className = "feedback-box feedback-box--success";
+      feedbackEl.innerHTML = `
+        <strong>Servidor conectado exitosamente (HTTP ${res.status}):</strong>
+        <p>${data.service || "Servicio activo"} — ${data.status || "OK"}</p>
+        <small>Timestamp: ${data.timestamp || new Date().toISOString()}</small>
+      `;
+    } catch (err) {
+      feedbackEl.className = "feedback-box feedback-box--error";
+      feedbackEl.innerHTML = `
+        <strong>Error de conexión con el backend:</strong>
+        <p>${err.message}</p>
+        <small>Asegúrate de haber iniciado el servidor con <code>node server.js</code> en el puerto configurado.</small>
+      `;
+    }
+  }
+
+  // Botón "Procesar Cola (Plan B)" en DiagnosticView
+  if (event.target.id === "btn-diag-process-planb") {
+    const results = await processOutboxQueuePlanB("diagnostic-view");
+    alert(`Procesamiento finalizado:\nTotal: ${results.total}\nSincronizados: ${results.synced}\nFallidos: ${results.failed}`);
+    router.render();
+  }
+
+  // Botón "Limpiar Servidor" en DiagnosticView
+  if (event.target.id === "btn-diag-clear-server") {
+    const confirmed = confirm("¿Deseas vaciar todos los registros del servidor remoto para pruebas limpias?");
+    if (confirmed) {
+      try {
+        await fetch(getApiEndpoint(), { method: "DELETE" });
+        alert("Base de datos del servidor vaciada con éxito.");
+        router.render();
+      } catch (err) {
+        alert(`Error al limpiar servidor: ${err.message}`);
+      }
     }
   }
 
@@ -503,6 +722,46 @@ trackVisit();
 initNetworkStatus();
 initInstallUI();
 router.init();
+
+// Escuchador global de cambios de sincronización offline-first (Requisitos 3, 4 y 5)
+window.addEventListener("birdify-sync-change", async (event) => {
+  console.log("[main.js] Evento birdify-sync-change recibido:", event.detail);
+  const filterSelect = document.getElementById("filter-category");
+  const currentFilter = filterSelect ? filterSelect.value : "ALL";
+  await refreshSightingsList(currentFilter);
+  await updateSyncToolbar();
+
+  const msg = event.detail?.message;
+  if (msg?.type === "BIRDIFY_SYNC_ITEM_SUCCESS") {
+    showDbFeedback(
+      `☁️ ¡Envío confirmado por el servidor para "${msg.sighting?.birdName || "avistamiento"}"!`,
+      false
+    );
+  } else if (msg?.type === "BIRDIFY_SYNC_ITEM_ERROR") {
+    showDbFeedback(
+      `⚠️ Error de sincronización en servidor: ${msg.error}`,
+      true
+    );
+  }
+});
+
+// Eventos de bloqueo de IndexedDB (Requisito 2)
+window.addEventListener("birdify-db-blocked", (event) => {
+  console.warn("[main.js] Base de datos bloqueada por versión previa:", event.detail);
+  const alertEl = document.getElementById("db-blocked-alert");
+  if (alertEl) {
+    alertEl.style.display = "block";
+  }
+});
+
+window.addEventListener("birdify-db-blocking", (event) => {
+  console.warn("[main.js] Conexión cerrada para desbloquear actualización:", event.detail);
+  const alertEl = document.getElementById("db-blocked-alert");
+  if (alertEl) {
+    alertEl.innerHTML = "⚠️ <strong>Aviso:</strong> La base de datos se cerró temporalmente para permitir la actualización en otra pestaña.";
+    alertEl.style.display = "block";
+  }
+});
 
 // Requisito: Registro del Service Worker al cargar (o inmediato si ya cargó)
 async function initSW() {
