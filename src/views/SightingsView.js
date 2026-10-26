@@ -22,7 +22,6 @@ export default async function SightingsView() {
         <p class="subtitle">Registra tus observaciones de aves con enfoque Offline-First: persistencia local inmediata y sincronización remota.</p>
       </div>
 
-      <!-- Barra de Estado de Sincronización (Requisitos 3, 4 y 5) -->
       <div class="sync-status-toolbar card" id="sync-toolbar">
         <div class="sync-toolbar-left">
           <div class="sync-mode-indicator">
@@ -44,16 +43,13 @@ export default async function SightingsView() {
         </div>
       </div>
 
-      <!-- Aviso útil en caso de bloqueo de versión de IndexedDB (Requisito 2) -->
       <div id="db-blocked-alert" class="feedback-banner feedback-banner--error" style="display: none;" role="alert">
         ⚠️ <strong>Actualización de base de datos pausada:</strong> Hay otra pestaña abierta con una versión anterior. Cierra o recarga esa pestaña para que los cambios surtan efecto.
       </div>
 
-      <!-- Zona de mensajes de feedback al usuario: diferencia explícita entre guardado local y confirmación de servidor -->
       <div id="db-feedback" class="feedback-banner" style="display: none;" role="alert"></div>
 
       <div class="sightings-layout">
-        <!-- Formulario para agregar registros -->
         <div class="card sightings-form-card">
           <h3>Nuevo Avistamiento</h3>
           <p class="form-instruction">Al guardar, se registrará inmediatamente en el dispositivo y se programará su envío.</p>
@@ -66,7 +62,12 @@ export default async function SightingsView() {
 
             <div class="form-group">
               <label for="bird-location">Lugar / Ubicación *</label>
-              <input type="text" id="bird-location" name="location" placeholder="Ej. Parque Metropolitano" required />
+              <div style="display: flex; gap: 10px; margin-bottom: 5px;">
+                <input type="text" id="bird-location" name="location" placeholder="Ej. Parque Metropolitano" required style="flex: 1;" />
+                <!-- BOTÓN DE UBICACIÓN -->
+                <button type="button" id="btn-ubicacion" class="btn-save" style="padding: 0 15px; cursor: pointer; background-color: #0369a1;">📍 Mi Ubicación</button>
+              </div>
+              <div id="contenedor-alternativa" style="margin-top: 5px;"></div>
             </div>
 
             <div class="form-group">
@@ -91,13 +92,18 @@ export default async function SightingsView() {
               <textarea id="bird-notes" name="notes" rows="3" placeholder="Comportamiento, plumaje, hora..."></textarea>
             </div>
 
-            <button type="submit" class="btn-save" id="btn-submit-sighting">
-              💾 Guardar Avistamiento (Offline-First)
-            </button>
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+              <button type="submit" class="btn-save" id="btn-submit-sighting" style="flex: 1;">
+                💾 Guardar Avistamiento
+              </button>
+              <!-- BOTÓN DE COMPARTIR -->
+              <button type="button" id="btn-compartir" class="btn-save" style="flex: 1; cursor: pointer; background-color: #047857;">
+                📤 Compartir Avistamiento
+              </button>
+            </div>
           </form>
         </div>
 
-        <!-- Listado y Filtro por Índice -->
         <div class="sightings-list-container">
           <div class="list-controls card">
             <label for="filter-category"><strong>Filtrar por índice (Categoría):</strong></label>
@@ -117,7 +123,6 @@ export default async function SightingsView() {
         </div>
       </div>
 
-      <!-- Modal de Confirmación para Eliminar -->
       <div id="delete-modal" class="modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="modal-title">
         <div class="modal-card">
           <div class="modal-icon">⚠️</div>
@@ -133,9 +138,6 @@ export default async function SightingsView() {
   `;
 }
 
-/**
- * Función para generar las tarjetas de la lista, mostrando estado de sincronización y mensajes de error
- */
 export function renderSightingsList(items) {
   if (!items || items.length === 0) {
     return `
@@ -146,12 +148,10 @@ export function renderSightingsList(items) {
     `;
   }
 
-  // Ordenar los más recientes primero
   const sorted = [...items].sort((a, b) => (b.id || 0) - (a.id || 0));
 
   return sorted
     .map((item) => {
-      // Estado de sincronización: pendiente, sincronizando, error o enviado (confirmado)
       const syncStatus = item.syncStatus || (item.serverConfirmed ? "synced" : "pending");
       let statusBadge = "";
 
@@ -181,7 +181,6 @@ export function renderSightingsList(items) {
         <p class="sighting-detail"><strong>📅 Fecha:</strong> ${item.date}</p>
         ${item.notes ? `<p class="sighting-notes"><em>"${item.notes}"</em></p>` : ""}
 
-        <!-- Mostrar último error cuando corresponda (Requisito 3) -->
         ${
           item.syncError
             ? `<div class="sighting-error-banner"><strong>Último error:</strong> ${item.syncError}</div>`

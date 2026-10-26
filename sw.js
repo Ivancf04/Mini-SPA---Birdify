@@ -11,7 +11,7 @@ console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v6";
+const CACHE_VERSION = "v7";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 // origenes externos que ocupa la app
@@ -34,6 +34,8 @@ const PRECACHE_LOCAL = [
   // App Shell
   "./",
   "./index.html",
+  "./src/utils/geolocation.js",
+  "./src/utils/share.js",
   // Estilos
   "./styles/shell.css",
   "./styles/home.css",

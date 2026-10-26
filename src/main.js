@@ -1,7 +1,7 @@
 import Router from "./router/router.js";
 import HomeView from "./views/HomeView.js";
 import AboutView from "./views/AboutView.js";
-import SightingsView from "./views/SightingsView.js";
+import SightingsView from "./views/SightingsView.js"; // Importación corregida
 import ItemDetailView from "./views/ItemDetailView.js";
 import DiagnosticView from "./views/DiagnosticView.js";
 import { 
@@ -13,7 +13,8 @@ import {
   setCookie, 
   deleteCookie, 
   setSession, 
-  removeSession } from "./utils/storage.js";
+  removeSession 
+} from "./utils/storage.js";
 import {
   saveSighting,
   saveSightingWithOutbox,
@@ -53,6 +54,10 @@ import {
   getInstallDiagnosticState,
   onInstallStateChange,
 } from "./pwa/installPrompt.js";
+
+// Importaciones para las nuevas funciones de ubicación y compartir
+import { obtenerUbicacion } from './utils/geolocation.js';
+import { compartirFicha } from './utils/share.js';
 
 // Requisito 3: El módulo debe iniciarse al arrancar la app, no al abrir una vista
 initInstallPrompt();
@@ -103,6 +108,7 @@ window.pwaInstall = {
   isIOS: isIOSDevice,
   getState: getInstallDiagnosticState,
 };
+
 // Función utilitaria para mostrar alertas visuales al usuario
 function showDbFeedback(message, isError = false, durationMs = 5000) {
   const banner = document.getElementById("db-feedback");
@@ -218,12 +224,14 @@ document.addEventListener("submit", async (event) => {
     );
   }
 });
+
 // 2. Filtrar registros usando el Índice de IndexedDB
 document.addEventListener("change", async (event) => {
   if (event.target.id !== "filter-category") return;
   const category = event.target.value;
   await refreshSightingsList(category);
 });
+
 // Variable para almacenar el ID del avistamiento a eliminar
 let sightingToDeleteId = null;
 
@@ -239,7 +247,7 @@ function closeDeleteModal() {
   if (modal) modal.style.display = "none";
 }
 
-// 3. Manejo de eliminación con modal de confirmación
+// 3. Manejo global de clics (eliminación, sincronización, geolocalización, compartir, etc.)
 document.addEventListener("click", async (event) => {
   // Clic en botón "Eliminar" de una tarjeta -> Abre el modal
   const deleteBtn = event.target.closest("[data-delete-id]");
@@ -272,6 +280,45 @@ document.addEventListener("click", async (event) => {
       showDbFeedback("No se pudo eliminar el registro.", true);
     }
     await updateSyncToolbar();
+  }
+
+  // Botón "Mi Ubicación" en SightingsView
+  if (event.target.id === "btn-ubicacion") {
+    const inputUbicacion = document.getElementById('bird-location');
+    const contenedorAlternativa = document.getElementById('contenedor-alternativa');
+    
+    const estadoPermiso = await navigator.permissions.query({ name: 'geolocation' });
+    
+    if (estadoPermiso.state === 'denied') {
+      contenedorAlternativa.innerHTML = '<p style="color: red; font-size: 13px;">Ubicación bloqueada. Habilítala en tu navegador o escribe la dirección manualmente.</p>';
+      if (inputUbicacion) inputUbicacion.focus();
+      return;
+    }
+
+    if (confirm("Birdify usará tu ubicación para registrar exactamente dónde viste el ave. ¿Continuar?")) {
+      try {
+        const coordenadas = await obtenerUbicacion();
+        if (inputUbicacion) inputUbicacion.value = `${coordenadas.lat}, ${coordenadas.lng}`;
+        contenedorAlternativa.innerHTML = '<p style="color: green; font-size: 13px;">¡Coordenadas obtenidas exitosamente!</p>';
+      } catch (error) {
+        alert(error.message);
+        contenedorAlternativa.innerHTML = '<p style="color: red; font-size: 13px;">Hubo un error. Ingresa la dirección manualmente.</p>';
+        if (inputUbicacion) inputUbicacion.focus();
+      }
+    }
+  }
+
+  // Botón "Compartir" en SightingsView
+  if (event.target.id === "btn-compartir") {
+    const nombreAve = document.getElementById('bird-name')?.value || "un ave";
+    const inputUbicacion = document.getElementById('bird-location');
+    const ubicacion = inputUbicacion?.value || "mi bitácora";
+    
+    compartirFicha(
+      "Nuevo avistamiento en Birdify",
+      `Acabo de registrar el avistamiento de ${nombreAve} en ${ubicacion}. ¡Mira mis registros en Birdify!`,
+      window.location.href
+    );
   }
 
   // Botón "Reintentar ahora" en SightingsView (Requisitos 3, 4 y 5)
@@ -415,6 +462,7 @@ document.addEventListener("click", async (event) => {
         .join("");
     }
   }
+  
   // Boton "Eliminar" individual de una entrada de cache
   const deleteCacheBtn = event.target.closest(".delete-cache-entry-btn");
   if (deleteCacheBtn) {
@@ -426,6 +474,7 @@ document.addEventListener("click", async (event) => {
     }
   }
 });
+
 // Función auxiliar para recargar la lista según el filtro
 async function refreshSightingsList(category = "ALL") {
   const listContainer = document.getElementById("sightings-list");
