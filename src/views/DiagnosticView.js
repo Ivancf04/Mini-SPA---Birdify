@@ -16,6 +16,7 @@ import {
   getApiEndpoint,
   SYNC_TAG,
 } from "../services/syncService.js";
+import { getNotificationDiagnosticState } from "../pwa/notifications.js";
 
 /**
  * Vista de diagnóstico:
@@ -55,6 +56,7 @@ export default async function DiagnosticView() {
   const bgSyncActive = isBackgroundSyncActive();
   const currentModeLabel = getSyncModeLabel();
   const apiEndpoint = getApiEndpoint();
+  const notifState = getNotificationDiagnosticState();
 
   // Definicion de las 5 rutas minimas requeridas para la verificacion de scope
   const testRoutes = [
@@ -182,6 +184,18 @@ export default async function DiagnosticView() {
             <strong>Modo actual de sincronización:</strong>
             <p class="diagnostic-value ${bgSyncActive ? "badge-success" : "badge-warning"}">
               ${currentModeLabel}
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Notificaciones locales de sincronización:</strong>
+            <p id="diag-notif-permission">
+              Permiso: <code>${notifState.permission}</code> |
+              Tag: <code>${notifState.tag}</code> |
+              Icono: <code>${notifState.iconPath}</code> |
+              Destino: <code>${notifState.targetUrl}</code>
             </p>
           </div>
         </div>

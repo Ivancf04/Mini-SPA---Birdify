@@ -43,6 +43,7 @@ import {
   registerInvalidScope,
   getCachedUrls,
   deleteCachedUrl,
+  BASE_PATH,
 } from "./pwa/registerSW.js";
 import { initNetworkStatus } from "./pwa/networkStatus.js";
 import {
@@ -54,6 +55,13 @@ import {
   getInstallDiagnosticState,
   onInstallStateChange,
 } from "./pwa/installPrompt.js";
+import {
+  initNotificationPermissionMonitor,
+  requestNotificationPermission,
+  onNotificationPermissionChange,
+  getNotificationDiagnosticState,
+  notifySightingsSynced,
+} from "./pwa/notifications.js";
 
 // Importaciones para las nuevas funciones de ubicación y compartir
 import { obtenerUbicacion } from './utils/geolocation.js';
@@ -63,6 +71,8 @@ import { compartirFicha } from './utils/share.js';
 initInstallPrompt();
 // Inicializar coordinador centralizado de Background Sync y Plan B (Requisitos 4 y 5)
 initSyncCoordinator();
+// Inicializar monitor pasivo de permisos de notificaciones (sin solicitar permiso automáticamente)
+initNotificationPermissionMonitor();
 
 // Funciones utilitarias expuestas globalmente en la consola de DevTools
 window.birdifySync = {
@@ -74,6 +84,11 @@ window.birdifySync = {
   getAllOutbox,
   getEndpoint: getApiEndpoint,
   setEndpoint: setApiEndpoint,
+};
+window.birdifyNotifications = {
+  getState: getNotificationDiagnosticState,
+  requestPermission: requestNotificationPermission,
+  notifySynced: notifySightingsSynced,
 };
 window.deleteCacheEntry = async function (url) {
   const ok = await deleteCachedUrl(url);
@@ -334,7 +349,10 @@ document.addEventListener("click", async (event) => {
       if (syncResult && syncResult.mode === "background-sync") {
         showDbFeedback("⚡ Background Sync registrado con el navegador. Procesando cola...", false);
       } else {
-        const results = await processOutboxQueuePlanB("btn-retry-sync-click");
+        const results =
+          syncResult && typeof syncResult.total === "number"
+            ? syncResult
+            : await processOutboxQueuePlanB("btn-retry-sync-click");
         if (results && results.synced > 0) {
           showDbFeedback(`☁️ Envío confirmado por el servidor: ${results.synced} avistamiento(s) sincronizado(s).`, false);
         } else if (results && results.failed > 0) {
@@ -766,11 +784,153 @@ function initInstallUI() {
   });
 }
 
+// Requisito 2: Control de permisos de notificaciones locales en el Shell
+let notificationBannerTimer = null;
+
+function showNotificationBanner(text, variant, autoHideMs = 0, clickUrl = null) {
+  const notifBanner = document.getElementById("notification-banner");
+  if (!notifBanner) return;
+  if (notificationBannerTimer) clearTimeout(notificationBannerTimer);
+  notifBanner.textContent = text;
+  notifBanner.dataset.variant = variant;
+  if (clickUrl) {
+    notifBanner.dataset.clickUrl = clickUrl;
+    notifBanner.style.cursor = "pointer";
+  } else {
+    delete notifBanner.dataset.clickUrl;
+    notifBanner.style.cursor = "";
+  }
+  notifBanner.hidden = false;
+  if (autoHideMs > 0) {
+    notificationBannerTimer = setTimeout(() => {
+      notifBanner.hidden = true;
+    }, autoHideMs);
+  }
+}
+
+function hideNotificationBanner() {
+  const notifBanner = document.getElementById("notification-banner");
+  if (!notifBanner) return;
+  if (notificationBannerTimer) clearTimeout(notificationBannerTimer);
+  notifBanner.hidden = true;
+}
+
+function initNotificationUI() {
+  const notifBtn = document.getElementById("notification-permission-btn");
+  const notifBanner = document.getElementById("notification-banner");
+
+  notifBanner?.addEventListener("click", () => {
+    const target = notifBanner.dataset.clickUrl;
+    if (target) {
+      hideNotificationBanner();
+      router.navigate(target);
+    }
+  });
+
+  onNotificationPermissionChange((state) => {
+    if (!notifBtn) return;
+
+    const permission = state.permission;
+    notifBtn.dataset.permissionState = permission;
+
+    if (permission === "unsupported") {
+      notifBtn.textContent = "🔕 Avisos no soportados";
+      notifBtn.disabled = true;
+      notifBtn.title = "Este navegador no soporta Notificaciones Web o Service Workers.";
+      hideNotificationBanner();
+      return;
+    }
+
+    notifBtn.disabled = false;
+
+    if (permission === "granted") {
+      notifBtn.textContent = "🔔 Avisos permitidos";
+      notifBtn.title = "Las notificaciones locales están permitidas.";
+      if (notifBanner && notifBanner.dataset.variant === "denied") {
+        hideNotificationBanner();
+      }
+    } else if (permission === "denied") {
+      notifBtn.textContent = "🔕 Avisos bloqueados";
+      notifBtn.title =
+        "Notificaciones bloqueadas. Habilítalas desde la configuración de permisos del sitio en el navegador.";
+      showNotificationBanner(
+        "🔕 Las notificaciones están bloqueadas. Para activarlas, habilita el permiso desde la configuración de permisos del sitio en tu navegador (icono junto a la barra de direcciones) y vuelve a la aplicación.",
+        "denied"
+      );
+    } else {
+      // default
+      notifBtn.textContent = "🔔 Activar avisos";
+      notifBtn.title =
+        "Permiso de notificaciones no solicitado. Haz clic para activar avisos de sincronización.";
+      if (notifBanner && notifBanner.dataset.variant === "denied") {
+        hideNotificationBanner();
+      }
+    }
+  });
+
+  notifBtn?.addEventListener("click", async () => {
+    const currentState = getNotificationDiagnosticState();
+
+    // En estado denied NO se vuelve a ejecutar la solicitud de permiso
+    if (currentState.permission === "denied") {
+      showNotificationBanner(
+        "🔕 Las notificaciones están bloqueadas por el navegador. Debes habilitarlas manualmente desde la configuración de permisos del sitio en la barra de direcciones.",
+        "denied"
+      );
+      return;
+    }
+
+    if (currentState.permission === "granted") {
+      showNotificationBanner(
+        "✅ Las notificaciones locales están permitidas. Recibirás un aviso cuando tus avistamientos se sincronicen con el servidor.",
+        "granted",
+        4000
+      );
+      return;
+    }
+
+    if (currentState.permission === "default") {
+      const outcome = await requestNotificationPermission();
+      if (outcome.state === "granted") {
+        showNotificationBanner(
+          "✅ ¡Notificaciones activadas! Te avisaremos cuando tus avistamientos terminen de sincronizarse.",
+          "granted",
+          4500
+        );
+      } else if (outcome.state === "denied") {
+        showNotificationBanner(
+          "🔕 Has bloqueado las notificaciones. Para habilitarlas después, cámbialo desde la configuración de permisos del sitio en el navegador.",
+          "denied"
+        );
+      }
+    }
+  });
+}
+
 initTheme();
 trackVisit();
 initNetworkStatus();
 initInstallUI();
+initNotificationUI();
 router.init();
+
+// Navegación desde clic en notificación local del Service Worker (Requisito 4)
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", async (event) => {
+    if (event.data?.type !== "BIRDIFY_NOTIFICATION_CLICK") return;
+    const targetUrl = event.data.url || `${BASE_PATH}avistamientos`;
+    try {
+      const parsed = new URL(targetUrl, window.location.origin);
+      router.navigate(parsed.pathname);
+      const filterSelect = document.getElementById("filter-category");
+      await refreshSightingsList(filterSelect ? filterSelect.value : "ALL");
+      await updateSyncToolbar();
+    } catch (err) {
+      console.warn("[main.js] Error al navegar tras clic en notificación:", err);
+      router.navigate("/avistamientos");
+    }
+  });
+}
 
 // Escuchador global de cambios de sincronización offline-first (Requisitos 3, 4 y 5)
 window.addEventListener("birdify-sync-change", async (event) => {
@@ -781,9 +941,12 @@ window.addEventListener("birdify-sync-change", async (event) => {
   await updateSyncToolbar();
 
   const msg = event.detail?.message;
+  const planBResults = event.detail?.results;
+
   if (msg?.type === "BIRDIFY_SYNC_ITEM_SUCCESS") {
+    const birdLabel = msg.sighting?.birdName || "avistamiento";
     showDbFeedback(
-      `☁️ ¡Envío confirmado por el servidor para "${msg.sighting?.birdName || "avistamiento"}"!`,
+      `☁️ ¡Envío confirmado por el servidor para "${birdLabel}"!`,
       false
     );
   } else if (msg?.type === "BIRDIFY_SYNC_ITEM_ERROR") {
@@ -791,6 +954,33 @@ window.addEventListener("birdify-sync-change", async (event) => {
       `⚠️ Error de sincronización en servidor: ${msg.error}`,
       true
     );
+  }
+
+  // Mostrar aviso en el Shell (incluso si el usuario está en Inicio '/') cuando termina un lote sincronizado
+  const syncedCount =
+    (msg?.type === "BIRDIFY_SYNC_BATCH_FINISHED" ? msg.synced : 0) ||
+    (planBResults && !event.detail?.isSyncing ? planBResults.synced : 0);
+
+  if (syncedCount > 0) {
+    const notifState = getNotificationDiagnosticState();
+    const firstItem =
+      msg?.syncedItems?.[0] || planBResults?.syncedItems?.[0] || {};
+    const birdText = firstItem.birdName ? ` («${firstItem.birdName}»)` : "";
+
+    if (notifState.permission === "granted") {
+      showNotificationBanner(
+        `🔔 Avistamiento sincronizado con el servidor${birdText}. Se envió la notificación local (haz clic en ella o aquí para ir a Avistamientos).`,
+        "granted",
+        8000,
+        "/avistamientos"
+      );
+    } else if (notifState.permission === "default") {
+      showNotificationBanner(
+        `☁️ Avistamiento sincronizado${birdText}. Para recibir notificaciones del navegador, haz clic primero en «🔔 Activar avisos» en la barra superior.`,
+        "default",
+        8000
+      );
+    }
   }
 });
 

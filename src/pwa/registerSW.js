@@ -14,6 +14,8 @@ export const BASE_PATH =
 export const SW_PATH = `${BASE_PATH}sw.js`;
 export const SW_SCOPE = BASE_PATH;
 
+let isRefreshingOnControllerChange = false;
+
 /**
  * Registra el Service Worker con scope explicito usando try/catch.
  * @returns {Promise<ServiceWorkerRegistration|null>}
@@ -26,11 +28,27 @@ export async function registerServiceWorker() {
   }
 
   try {
+    const hadPreviousController = Boolean(navigator.serviceWorker.controller);
+
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      // Si ya existía un SW controlando la pestaña (que sirvió index.html viejo desde Cache First)
+      // y un nuevo SW tomó el control tras actualizar CACHE_VERSION, recargar una sola vez.
+      if (hadPreviousController && !isRefreshingOnControllerChange) {
+        isRefreshingOnControllerChange = true;
+        console.log("[registerSW] Nuevo Service Worker activado. Recargando para aplicar el nuevo App Shell...");
+        window.location.reload();
+      }
+    });
+
     // Requisito: Registrar con scope explicito y ruta base constante
     console.log(`[registerSW] Intentando registrar SW en: ${SW_PATH} con scope: ${SW_SCOPE}`);
     const registration = await navigator.serviceWorker.register(SW_PATH, {
       scope: SW_SCOPE,
     });
+
+    if (navigator.onLine) {
+      registration.update().catch(() => {});
+    }
 
     console.log("[registerSW] Registro exitoso:", {
       scope: registration.scope,

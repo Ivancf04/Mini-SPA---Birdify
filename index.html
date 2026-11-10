@@ -74,6 +74,17 @@
         💡 Cómo instalar
       </button>
 
+      <!-- Control de permisos de notificaciones locales en el Shell -->
+      <button
+        id="notification-permission-btn"
+        class="btn-notification"
+        type="button"
+        data-permission-state="default"
+        aria-label="Estado y permisos de notificaciones"
+      >
+        🔔 Activar avisos
+      </button>
+
       <button id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">🌙</button>
       <!-- Insignia de conectividad (la controla src/pwa/networkStatus.js) -->
       <span id="network-badge" class="network-badge" role="status" aria-live="polite" hidden></span>
@@ -82,6 +93,9 @@
 
   <!-- Franja explicativa cuando no hay red o se sirve una copia guardada -->
   <div id="network-banner" class="network-banner" role="status" aria-live="polite" hidden></div>
+
+  <!-- Franja de estado de permisos de notificaciones en el Shell (explicación en estado denied / confirmación) -->
+  <div id="notification-banner" class="notification-banner" role="status" aria-live="polite" hidden></div>
 
   <!--
     contendor raiz única zona que el router modifica.

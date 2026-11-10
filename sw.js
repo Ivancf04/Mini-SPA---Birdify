@@ -11,7 +11,7 @@ console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v7";
+const CACHE_VERSION = "v10";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 // origenes externos que ocupa la app
@@ -30,7 +30,7 @@ const INATURALIST_HOME_URL =
 // 2. precaching
 // ─────────────────────────────────────────────────────────────────────
 // todo lo necesario para arrancar y navegar sin red.
-const PRECACHE_LOCAL = [
+const APP_SHELL = [
   // App Shell
   "./",
   "./index.html",
@@ -49,6 +49,7 @@ const PRECACHE_LOCAL = [
   "./src/pwa/registerSW.js",
   "./src/pwa/networkStatus.js",
   "./src/pwa/installPrompt.js",
+  "./src/pwa/notifications.js",
   // Vistas (NotFoundView e ItemDetailView -> apiService se cargan con import())
   "./src/views/HomeView.js",
   "./src/views/AboutView.js",
@@ -56,6 +57,7 @@ const PRECACHE_LOCAL = [
   "./src/views/ItemDetailView.js",
   "./src/views/DiagnosticView.js",
   "./src/views/NotFoundView.js",
+  "./src/views/mapa.js",
   // Componentes
   "./src/components/ItemCard.js",
   // Servicios
@@ -79,6 +81,7 @@ const PRECACHE_LOCAL = [
   "./screenshots/screenshot-desktop.png",
   "./screenshots/screenshot-mobile.png",
 ];
+const PRECACHE_LOCAL = APP_SHELL;
 
 const PRECACHE_EXTERNAL = [IDB_MODULE_URL];
 
@@ -528,6 +531,70 @@ function swUpdateOutboxAttempt(clientRequestId, errorMessage) {
 }
 
 /**
+ * Muestra una notificación local desde el Service Worker cuando se confirma la sincronización
+ * de avistamientos por Background Sync.
+ */
+async function swShowSyncNotification(syncedItems = []) {
+  try {
+    if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
+      console.info(
+        `[SW] Sincronización completada, pero el permiso de notificaciones es '${Notification.permission}' (se requiere 'granted' mediante el botón '🔔 Activar avisos').`
+      );
+      return false;
+    }
+    if (!self.registration || typeof self.registration.showNotification !== "function") {
+      return false;
+    }
+
+    const list = Array.isArray(syncedItems) ? syncedItems : [];
+    if (list.length === 0) return false;
+
+    const count = list.length;
+    const first = list[0] || {};
+    const birdName = first.birdName ? String(first.birdName).trim() : "";
+    const location = first.location ? String(first.location).trim() : "";
+
+    const title =
+      count === 1
+        ? "Avistamiento sincronizado"
+        : `Avistamientos sincronizados (${count})`;
+
+    let body;
+    if (count === 1 && birdName) {
+      body = `Se confirmó en el servidor el registro de «${birdName}»${
+        location ? ` en ${location}` : ""
+      }.`;
+    } else if (count > 1 && birdName) {
+      body = `Se sincronizaron ${count} avistamientos pendientes con el servidor (incluyendo «${birdName}»).`;
+    } else {
+      body = `Se sincronizaron ${count} avistamiento(s) pendiente(s) con el servidor.`;
+    }
+
+    const icon = `${SCOPE_PATH}icons/icon-192.png`;
+    const badge = `${SCOPE_PATH}icons/favicon-32.png`;
+    const targetUrl = `${SCOPE_PATH}avistamientos`;
+
+    await self.registration.showNotification(title, {
+      body,
+      icon,
+      badge,
+      tag: SYNC_TAG_NAME,
+      data: {
+        url: targetUrl,
+        syncedCount: count,
+        clientRequestId: first.clientRequestId || null,
+        timestamp: new Date().toISOString(),
+      },
+    });
+    return true;
+  } catch (err) {
+    // Requisito 3: Un fallo al mostrar la notificación nunca debe hacer fallar la sincronización
+    console.warn("[SW] No se pudo mostrar la notificación local tras Background Sync:", err);
+    return false;
+  }
+}
+
+/**
  * Procesa la cola outbox durante el evento Background Sync
  */
 async function processOutboxQueueInSW() {
@@ -541,6 +608,7 @@ async function processOutboxQueueInSW() {
   const endpoint = configuredBackendEndpoint;
   let failedCount = 0;
   let lastFatalError = null;
+  const syncedItems = [];
 
   for (const item of items) {
     try {
@@ -576,6 +644,11 @@ async function processOutboxQueueInSW() {
       // Confirmado por el servidor
       console.log(`[SW] Avistamiento confirmado por servidor: ${item.clientRequestId}`, data);
       await swMarkSightingAsSynced(item.clientRequestId, data);
+      syncedItems.push({
+        clientRequestId: item.clientRequestId,
+        birdName: data?.sighting?.birdName || item.payload?.birdName,
+        location: data?.sighting?.location || item.payload?.location,
+      });
       await notifyClients({
         type: "BIRDIFY_SYNC_ITEM_SUCCESS",
         clientRequestId: item.clientRequestId,
@@ -594,12 +667,19 @@ async function processOutboxQueueInSW() {
     }
   }
 
+  let notificationShownBySW = false;
+  if (syncedItems.length > 0) {
+    notificationShownBySW = await swShowSyncNotification(syncedItems);
+  }
+
   // Notificar estado final a ventanas
   await notifyClients({
     type: "BIRDIFY_SYNC_BATCH_FINISHED",
     total: items.length,
     failed: failedCount,
     synced: items.length - failedCount,
+    syncedItems,
+    notificationShownBySW,
   });
 
   // Requisito 4: PROPAGAR RECHAZO HASTA waitUntil
@@ -628,4 +708,120 @@ self.addEventListener("sync", (event) => {
     // Pasa a event.waitUntil la promesa que procesa la cola
     event.waitUntil(processOutboxQueueInSW());
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 10. NOTIFICATIONCLICK (Navegación segura y enfoque de ventana)
+// ─────────────────────────────────────────────────────────────────────
+const VALID_APP_ROUTES = new Set([
+  "/",
+  "/index.html",
+  "/acerca",
+  "/avistamientos",
+  "/diagnostico",
+]);
+
+function isValidInternalRoutePath(routePath) {
+  if (VALID_APP_ROUTES.has(routePath)) return true;
+  if (/^\/item\/[^/]+$/.test(routePath)) return true;
+  return false;
+}
+
+/**
+ * Valida que el destino de la notificación corresponda a la aplicación y respeta
+ * el esquema real de rutas (History API + ruta base de GitHub Pages o hash si se recibiera).
+ * Si el dato está ausente o es inválido/externo, devuelve una ruta de respaldo segura.
+ */
+function resolveNotificationTargetUrl(rawUrl) {
+  const scopeUrl = new URL(SCOPE_PATH, self.location.origin);
+  const safeFallbackUrl = new URL(`${SCOPE_PATH}avistamientos`, self.location.origin).href;
+
+  if (!rawUrl || typeof rawUrl !== "string" || !rawUrl.trim()) {
+    return safeFallbackUrl;
+  }
+
+  try {
+    const candidate = new URL(rawUrl.trim(), scopeUrl);
+
+    // Rechazar orígenes distintos al de la aplicación
+    if (candidate.origin !== self.location.origin) {
+      return safeFallbackUrl;
+    }
+
+    // Si se recibiera una ruta con hash (ej. #/avistamientos), normalizarla al router real
+    if (candidate.hash && candidate.hash.startsWith("#/")) {
+      const hashPath = candidate.hash.slice(1).split("?")[0];
+      if (isValidInternalRoutePath(hashPath)) {
+        return new URL(`${SCOPE_PATH}${hashPath.replace(/^\//, "")}`, self.location.origin).href;
+      }
+      return safeFallbackUrl;
+    }
+
+    const pathname = candidate.pathname;
+    let relativeRoute = pathname;
+
+    if (SCOPE_PATH !== "/" && pathname.startsWith(SCOPE_PATH)) {
+      relativeRoute = "/" + pathname.slice(SCOPE_PATH.length);
+    } else if (SCOPE_PATH !== "/" && !pathname.startsWith(SCOPE_PATH)) {
+      // Si se pasó una ruta interna sin el prefijo de GitHub Pages (ej. "/avistamientos")
+      if (isValidInternalRoutePath(pathname)) {
+        return new URL(`${SCOPE_PATH}${pathname.replace(/^\//, "")}`, self.location.origin).href;
+      }
+      return safeFallbackUrl;
+    }
+
+    if (!isValidInternalRoutePath(relativeRoute)) {
+      return safeFallbackUrl;
+    }
+
+    return new URL(`${SCOPE_PATH}${relativeRoute.replace(/^\//, "")}`, self.location.origin).href;
+  } catch {
+    return safeFallbackUrl;
+  }
+}
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const rawUrl = event.notification?.data?.url;
+  const targetUrl = resolveNotificationTargetUrl(rawUrl);
+  const scopeHref = new URL(SCOPE_PATH, self.location.origin).href;
+
+  event.waitUntil(
+    (async () => {
+      const windowClients = await self.clients.matchAll({
+        type: "window",
+        includeUncontrolled: true,
+      });
+
+      const appClient =
+        windowClients.find((client) => client.url && client.url.startsWith(scopeHref)) ||
+        windowClients.find((client) => {
+          try {
+            return new URL(client.url).origin === self.location.origin;
+          } catch {
+            return false;
+          }
+        });
+
+      if (appClient) {
+        if ("focus" in appClient && typeof appClient.focus === "function") {
+          await appClient.focus();
+        }
+        if (typeof appClient.postMessage === "function") {
+          appClient.postMessage({
+            type: "BIRDIFY_NOTIFICATION_CLICK",
+            url: targetUrl,
+          });
+        } else if ("navigate" in appClient && typeof appClient.navigate === "function") {
+          await appClient.navigate(targetUrl);
+        }
+        return;
+      }
+
+      if (self.clients.openWindow) {
+        await self.clients.openWindow(targetUrl);
+      }
+    })()
+  );
 });

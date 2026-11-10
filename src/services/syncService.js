@@ -13,6 +13,7 @@ import {
   updateOutboxAttempt,
   markSightingAsSyncing,
 } from "./dbService.js";
+import { notifySightingsSynced } from "../pwa/notifications.js";
 
 export const SYNC_TAG = "birdify-sync-sightings";
 export const DEFAULT_API_ENDPOINT = "http://localhost:3000/api/sightings";
@@ -21,6 +22,8 @@ export const STORAGE_KEY_FORCE_PLAN_B = "birdify_force_plan_b";
 
 // Bandera para evitar ejecuciones concurrentes del Plan B en la pestaña
 let isProcessingQueue = false;
+// Bandera para evitar registrar listeners duplicados en el coordinador
+let isCoordinatorInitialized = false;
 
 /**
  * Obtiene el endpoint efectivo del servidor backend
@@ -189,6 +192,7 @@ export async function processOutboxQueuePlanB(triggerReason = "manual") {
     synced: 0,
     failed: 0,
     errors: [],
+    syncedItems: [],
   };
 
   try {
@@ -242,6 +246,11 @@ export async function processOutboxQueuePlanB(triggerReason = "manual") {
         console.log(`[SyncService][Plan B] Avistamiento confirmado por servidor: ${item.clientRequestId}`, data);
         await markSightingAsSynced(item.clientRequestId, data);
         results.synced++;
+        results.syncedItems.push({
+          clientRequestId: item.clientRequestId,
+          birdName: data?.sighting?.birdName || item.payload?.birdName,
+          location: data?.sighting?.location || item.payload?.location,
+        });
       } catch (err) {
         const errorMsg = err.name === "AbortError"
           ? "Timeout de red al conectar con el servidor"
@@ -252,6 +261,11 @@ export async function processOutboxQueuePlanB(triggerReason = "manual") {
         results.failed++;
         results.errors.push({ id: item.clientRequestId, error: errorMsg });
       }
+    }
+
+    // Requisito 3: Disparar notificación local solo cuando se confirma la sincronización exitosa
+    if (results.synced > 0) {
+      await notifySightingsSynced(results.syncedItems);
     }
   } finally {
     isProcessingQueue = false;
@@ -268,7 +282,8 @@ export async function processOutboxQueuePlanB(triggerReason = "manual") {
  * 3. Escucha mensajes de sincronización del Service Worker.
  */
 export function initSyncCoordinator() {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || isCoordinatorInitialized) return;
+  isCoordinatorInitialized = true;
 
   // 1. Al abrir la aplicación: si hay pendientes y hay red, procesar cola
   if (navigator.onLine) {
@@ -288,10 +303,18 @@ export function initSyncCoordinator() {
 
   // 3. Escuchar notificaciones desde el Service Worker (Background Sync)
   if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.addEventListener("message", (event) => {
+    navigator.serviceWorker.addEventListener("message", async (event) => {
       const data = event.data;
       if (data && data.type && data.type.startsWith("BIRDIFY_SYNC_")) {
         console.log("[SyncService] Mensaje recibido del Service Worker:", data);
+        if (
+          data.type === "BIRDIFY_SYNC_BATCH_FINISHED" &&
+          data.synced > 0 &&
+          !data.notificationShownBySW &&
+          Array.isArray(data.syncedItems)
+        ) {
+          await notifySightingsSynced(data.syncedItems);
+        }
         dispatchSyncStatusChange({ fromSW: true, message: data });
       }
     });
