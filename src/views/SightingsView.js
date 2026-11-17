@@ -1,15 +1,22 @@
 import { getAllSightings, getOutboxCount } from "../services/dbService.js";
 import { getSyncModeLabel, isBackgroundSyncActive } from "../services/syncService.js";
+import { getPushSubscription, isPushManagerSupported } from "../pwa/pushNotifications.js";
 
 export default async function SightingsView() {
   let sightings = [];
   let outboxCount = 0;
+  let isPushSubscribed = false;
+  const pushSupported = isPushManagerSupported();
 
   try {
     sightings = await getAllSightings();
     outboxCount = await getOutboxCount();
+    if (pushSupported) {
+      const sub = await getPushSubscription();
+      isPushSubscribed = Boolean(sub);
+    }
   } catch (error) {
-    console.error("Error al cargar avistamientos desde IndexedDB:", error);
+    console.error("Error al cargar avistamientos desde IndexedDB o estado push:", error);
   }
 
   const isBgSync = isBackgroundSyncActive();
@@ -36,12 +43,23 @@ export default async function SightingsView() {
             </span>
           </div>
         </div>
-        <div class="sync-toolbar-right">
+        <div class="sync-toolbar-right" style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          ${
+            pushSupported
+              ? `
+            <button type="button" id="btn-toggle-push" class="btn-retry-sync ${isPushSubscribed ? "btn-push-active" : ""}" style="${isPushSubscribed ? "background-color: #0369a1; border-color: #0284c7; color: white;" : ""}" title="${isPushSubscribed ? "Notificaciones Push activas en este dispositivo. Clic para desactivar." : "Haz clic para activar notificaciones push de nuevos avistamientos."}">
+              ${isPushSubscribed ? "🔔 Push: Activo" : "🔕 Activar Push"}
+            </button>
+          `
+              : ""
+          }
           <button type="button" id="btn-retry-sync" class="btn-retry-sync" title="Procesar cola outbox ahora">
             🔄 Reintentar ahora
           </button>
         </div>
       </div>
+
+      <div id="push-feedback-alert" class="feedback-banner" style="display: none; margin-bottom: 1rem;" role="alert"></div>
 
       <div id="db-blocked-alert" class="feedback-banner feedback-banner--error" style="display: none;" role="alert">
         ⚠️ <strong>Actualización de base de datos pausada:</strong> Hay otra pestaña abierta con una versión anterior. Cierra o recarga esa pestaña para que los cambios surtan efecto.

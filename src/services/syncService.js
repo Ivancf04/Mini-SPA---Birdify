@@ -14,9 +14,10 @@ import {
   markSightingAsSyncing,
 } from "./dbService.js";
 import { notifySightingsSynced } from "../pwa/notifications.js";
+import { API_ENDPOINTS } from "../config.js";
 
 export const SYNC_TAG = "birdify-sync-sightings";
-export const DEFAULT_API_ENDPOINT = "http://localhost:3000/api/sightings";
+export const DEFAULT_API_ENDPOINT = API_ENDPOINTS.sightings();
 export const STORAGE_KEY_API_ENDPOINT = "birdify_api_endpoint";
 export const STORAGE_KEY_FORCE_PLAN_B = "birdify_force_plan_b";
 
@@ -33,7 +34,7 @@ export function getApiEndpoint() {
     const custom = localStorage.getItem(STORAGE_KEY_API_ENDPOINT);
     if (custom && custom.trim()) return custom.trim();
   }
-  return DEFAULT_API_ENDPOINT;
+  return API_ENDPOINTS.sightings();
 }
 
 /**

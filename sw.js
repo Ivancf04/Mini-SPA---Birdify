@@ -11,7 +11,7 @@ console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v10";
+const CACHE_VERSION = "v11";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
 // origenes externos que ocupa la app
@@ -44,12 +44,14 @@ const APP_SHELL = [
   "./styles/theme.css",
   "./styles/diagnostic.css",
   // Punto de entrada, router y PWA
+  "./src/config.js",
   "./src/main.js",
   "./src/router/router.js",
   "./src/pwa/registerSW.js",
   "./src/pwa/networkStatus.js",
   "./src/pwa/installPrompt.js",
   "./src/pwa/notifications.js",
+  "./src/pwa/pushNotifications.js",
   // Vistas (NotFoundView e ItemDetailView -> apiService se cargan con import())
   "./src/views/HomeView.js",
   "./src/views/AboutView.js",
@@ -389,10 +391,13 @@ const ROUTES = [
 ];
 
 function chooseStrategy(request) {
-
   if (request.method !== "GET") return null;
 
   const url = new URL(request.url);
+
+  // Excluir explícitamente todas las llamadas a la API del backend para no cachear datos dinámicos
+  if (url.pathname.includes("/api/")) return null;
+
   // - Esquemas que no son http(s) (chrome-extension:, data:, blob:).
   if (!url.protocol.startsWith("http")) return null;
   // - Peticiones parciales (Range), p. ej. audio/video: la caché no las soporta bien.
@@ -824,4 +829,91 @@ self.addEventListener("notificationclick", (event) => {
       }
     })()
   );
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// 11. WEB PUSH NOTIFICATIONS (Servidor -> Service Worker)
+// ─────────────────────────────────────────────────────────────────────
+function normalizeScopedUrl(rawUrl, scopePath = SCOPE_PATH) {
+  if (!rawUrl || typeof rawUrl !== "string") return rawUrl;
+  const trimmed = rawUrl.trim();
+  if (!trimmed) return trimmed;
+
+  // Dejar intactas URLs absolutas HTTP(S)
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Si ya inicia con SCOPE_PATH (ej. "/Mini-SPA---Birdify/..." o "/..." en raíz), no re-prefijar
+  if (trimmed.startsWith(scopePath)) {
+    return trimmed;
+  }
+
+  // Manejar ruta con subdirectorio sin barra inicial (ej. "Mini-SPA---Birdify/icons/...")
+  const scopeWithoutLeadingSlash = scopePath.replace(/^\/+/, "");
+  if (scopeWithoutLeadingSlash && trimmed.startsWith(scopeWithoutLeadingSlash)) {
+    return `/${trimmed}`;
+  }
+
+  // Normalizar rutas relativas ("icons/...", "./icons/...") o absolutas de raíz ("/icons/...")
+  const cleanRelative = trimmed.replace(/^(?:\.\/)+/, "").replace(/^\/+/, "");
+  return `${scopePath}${cleanRelative}`;
+}
+
+self.addEventListener("push", (event) => {
+  console.log("[sw.js] Evento 'push' recibido del servidor.");
+
+  let payload = {
+    title: "Birdify",
+    body: "¡Nuevo avistamiento registrado en Birdify!",
+    icon: `${SCOPE_PATH}icons/icon-192.png`,
+    badge: `${SCOPE_PATH}icons/favicon-32.png`,
+    tag: "birdify-sighting-push",
+    data: {
+      url: `${SCOPE_PATH}avistamientos`,
+      timestamp: new Date().toISOString(),
+    },
+  };
+
+  if (event.data) {
+    try {
+      const json = event.data.json();
+      payload = {
+        ...payload,
+        ...json,
+        data: {
+          ...payload.data,
+          ...(json.data || {}),
+        },
+      };
+    } catch {
+      const text = event.data.text();
+      if (text) {
+        payload.body = text;
+      }
+    }
+  }
+
+  // Resolver rutas relativas de iconos y URLs al scope del Service Worker (evita fallos en GitHub Pages)
+  if (payload.icon) {
+    payload.icon = normalizeScopedUrl(payload.icon, SCOPE_PATH);
+  }
+  if (payload.badge) {
+    payload.badge = normalizeScopedUrl(payload.badge, SCOPE_PATH);
+  }
+  if (payload.data && payload.data.url) {
+    payload.data.url = normalizeScopedUrl(payload.data.url, SCOPE_PATH);
+  }
+
+  const options = {
+    body: payload.body,
+    icon: payload.icon,
+    badge: payload.badge,
+    tag: payload.tag || "birdify-sighting-push",
+    data: payload.data,
+    vibrate: [100, 50, 100],
+    renotify: true,
+  };
+
+  event.waitUntil(self.registration.showNotification(payload.title, options));
 });

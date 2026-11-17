@@ -62,6 +62,16 @@ import {
   getNotificationDiagnosticState,
   notifySightingsSynced,
 } from "./pwa/notifications.js";
+import { API_ENDPOINTS, getApiBaseUrl, getUserId } from "./config.js";
+import {
+  isPushManagerSupported,
+  getPushSubscription,
+  subscribeToPush,
+  unsubscribeFromPush,
+  syncPushSubscriptionOnStartup,
+  onPushStateChange,
+  getPushDiagnosticState,
+} from "./pwa/pushNotifications.js";
 
 // Importaciones para las nuevas funciones de ubicación y compartir
 import { obtenerUbicacion } from './utils/geolocation.js';
@@ -73,6 +83,13 @@ initInstallPrompt();
 initSyncCoordinator();
 // Inicializar monitor pasivo de permisos de notificaciones (sin solicitar permiso automáticamente)
 initNotificationPermissionMonitor();
+
+// Sincronización automática de suscripción Web Push al arrancar la app
+if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+  syncPushSubscriptionOnStartup().catch((err) => {
+    console.warn("[main.js] Falló la resincronización de push al inicio:", err);
+  });
+}
 
 // Funciones utilitarias expuestas globalmente en la consola de DevTools
 window.birdifySync = {
@@ -89,6 +106,17 @@ window.birdifyNotifications = {
   getState: getNotificationDiagnosticState,
   requestPermission: requestNotificationPermission,
   notifySynced: notifySightingsSynced,
+};
+window.birdifyPush = {
+  isSupported: isPushManagerSupported,
+  getState: getPushDiagnosticState,
+  getSubscription: getPushSubscription,
+  subscribe: subscribeToPush,
+  unsubscribe: unsubscribeFromPush,
+  resync: syncPushSubscriptionOnStartup,
+  getUserId,
+  getApiBaseUrl,
+  endpoints: API_ENDPOINTS,
 };
 window.deleteCacheEntry = async function (url) {
   const ok = await deleteCachedUrl(url);
@@ -452,6 +480,162 @@ document.addEventListener("click", async (event) => {
         router.render();
       } catch (err) {
         alert(`Error al limpiar servidor: ${err.message}`);
+      }
+    }
+  }
+
+  // Botón "Activar / Desactivar Push" en SightingsView (Unidad 4 — Ejercicio 6)
+  if (event.target.id === "btn-toggle-push") {
+    const btn = event.target;
+    const feedbackEl = document.getElementById("push-feedback-alert");
+    btn.disabled = true;
+    btn.textContent = "⏳ Procesando...";
+
+    try {
+      const currentSub = await getPushSubscription();
+      if (currentSub) {
+        const res = await unsubscribeFromPush();
+        if (res.ok) {
+          btn.textContent = "🔕 Activar Push";
+          btn.classList.remove("btn-push-active");
+          btn.style.backgroundColor = "";
+          btn.style.borderColor = "";
+          btn.style.color = "";
+          btn.title = "Haz clic para activar notificaciones push de nuevos avistamientos.";
+          if (feedbackEl) {
+            feedbackEl.style.display = "block";
+            feedbackEl.className = "feedback-banner feedback-banner--info";
+            feedbackEl.innerHTML = "🔕 Notificaciones push canceladas en este dispositivo.";
+            setTimeout(() => { feedbackEl.style.display = "none"; }, 5000);
+          }
+        } else {
+          throw new Error(res.error || "No se pudo cancelar la suscripción.");
+        }
+      } else {
+        const res = await subscribeToPush();
+        if (res.ok) {
+          btn.textContent = "🔔 Push: Activo";
+          btn.classList.add("btn-push-active");
+          btn.style.backgroundColor = "#0369a1";
+          btn.style.borderColor = "#0284c7";
+          btn.style.color = "white";
+          btn.title = "Notificaciones Push activas. Clic para desactivar.";
+          if (feedbackEl) {
+            feedbackEl.style.display = "block";
+            feedbackEl.className = "feedback-banner feedback-banner--success";
+            feedbackEl.innerHTML = "🔔 ¡Suscripción exitosa! Recibirás avisos instantáneos cuando se registren nuevos avistamientos en el servidor.";
+            setTimeout(() => { feedbackEl.style.display = "none"; }, 6000);
+          }
+        } else {
+          if (feedbackEl) {
+            feedbackEl.style.display = "block";
+            feedbackEl.className = "feedback-banner feedback-banner--error";
+            feedbackEl.innerHTML = `⚠️ ${res.error || "No se pudo activar la suscripción."}`;
+          }
+        }
+      }
+    } catch (err) {
+      if (feedbackEl) {
+        feedbackEl.style.display = "block";
+        feedbackEl.className = "feedback-banner feedback-banner--error";
+        feedbackEl.innerHTML = `⚠️ Error: ${err.message}`;
+      }
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // Botones de Web Push en DiagnosticView (Unidad 4 — Ejercicio 6)
+  if (event.target.id === "btn-diag-subscribe-push") {
+    const feedbackEl = document.getElementById("push-diag-feedback");
+    if (feedbackEl) {
+      feedbackEl.style.display = "block";
+      feedbackEl.className = "feedback-box";
+      feedbackEl.innerHTML = "⏳ Solicitando permiso y suscribiendo con PushManager...";
+    }
+    const result = await subscribeToPush();
+    if (feedbackEl) {
+      if (result.ok) {
+        feedbackEl.className = "feedback-box feedback-box--success";
+        feedbackEl.innerHTML = `
+          <strong>Suscripción Push exitosa:</strong>
+          <p style="word-break: break-all;">Endpoint: <code>${result.subscription?.endpoint}</code></p>
+          <small>Persistida en Supabase (public.push_subscriptions) con user_id: <code>${getUserId()}</code></small>
+        `;
+      } else {
+        feedbackEl.className = "feedback-box feedback-box--error";
+        feedbackEl.innerHTML = `<strong>Error de suscripción:</strong> <p>${result.error || result.reason}</p>`;
+      }
+    }
+    router.render();
+  }
+
+  if (event.target.id === "btn-diag-unsubscribe-push") {
+    const feedbackEl = document.getElementById("push-diag-feedback");
+    if (feedbackEl) {
+      feedbackEl.style.display = "block";
+      feedbackEl.className = "feedback-box";
+      feedbackEl.innerHTML = "⏳ Cancelando suscripción en navegador y Supabase...";
+    }
+    const result = await unsubscribeFromPush();
+    if (feedbackEl) {
+      if (result.ok) {
+        feedbackEl.className = "feedback-box feedback-box--success";
+        feedbackEl.innerHTML = "<strong>Suscripción cancelada:</strong> <p>El endpoint ha sido eliminado de Supabase y de PushManager.</p>";
+      } else {
+        feedbackEl.className = "feedback-box feedback-box--error";
+        feedbackEl.innerHTML = `<strong>Error al desuscribir:</strong> <p>${result.error}</p>`;
+      }
+    }
+    router.render();
+  }
+
+  if (event.target.id === "btn-diag-resync-push") {
+    const feedbackEl = document.getElementById("push-diag-feedback");
+    if (feedbackEl) {
+      feedbackEl.style.display = "block";
+      feedbackEl.className = "feedback-box";
+      feedbackEl.innerHTML = "⏳ Resincronizando suscripción con backend...";
+    }
+    const result = await syncPushSubscriptionOnStartup();
+    if (feedbackEl) {
+      if (result.ok) {
+        feedbackEl.className = "feedback-box feedback-box--success";
+        feedbackEl.innerHTML = "<strong>Resincronización exitosa:</strong> <p>Suscripción activa sincronizada con Supabase.</p>";
+      } else {
+        feedbackEl.className = "feedback-box feedback-box--error";
+        feedbackEl.innerHTML = `<strong>Resultado:</strong> <p>${result.error || result.reason || "Sin suscripción activa"}</p>`;
+      }
+    }
+    router.render();
+  }
+
+  if (event.target.id === "btn-diag-check-vapid") {
+    const feedbackEl = document.getElementById("push-diag-feedback");
+    if (feedbackEl) {
+      feedbackEl.style.display = "block";
+      feedbackEl.className = "feedback-box";
+      feedbackEl.innerHTML = "⏳ Consultando clave pública VAPID al backend...";
+    }
+    try {
+      const res = await fetch(API_ENDPOINTS.vapidPublicKey());
+      const data = await res.json();
+      if (res.ok && data.publicKey) {
+        if (feedbackEl) {
+          feedbackEl.className = "feedback-box feedback-box--success";
+          feedbackEl.innerHTML = `
+            <strong>Clave pública VAPID obtenida (HTTP ${res.status}):</strong>
+            <p style="word-break: break-all; font-family: monospace;"><code>${data.publicKey}</code></p>
+            <small>Longitud: ${data.publicKey.length} caracteres base64url</small>
+          `;
+        }
+      } else {
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+    } catch (err) {
+      if (feedbackEl) {
+        feedbackEl.className = "feedback-box feedback-box--error";
+        feedbackEl.innerHTML = `<strong>Error consultando VAPID:</strong> <p>${err.message}</p>`;
       }
     }
   }
@@ -845,10 +1029,17 @@ function initNotificationUI() {
 
     if (permission === "granted") {
       notifBtn.textContent = "🔔 Avisos permitidos";
-      notifBtn.title = "Las notificaciones locales están permitidas.";
+      notifBtn.title = "Las notificaciones locales y push están permitidas.";
       if (notifBanner && notifBanner.dataset.variant === "denied") {
         hideNotificationBanner();
       }
+      // Si ya hay suscripción push activa, reflejar en el botón
+      getPushSubscription().then((sub) => {
+        if (sub && notifBtn) {
+          notifBtn.textContent = "🔔 Avisos activos";
+          notifBtn.title = "Notificaciones Web Push activadas en este dispositivo.";
+        }
+      }).catch(() => {});
     } else if (permission === "denied") {
       notifBtn.textContent = "🔕 Avisos bloqueados";
       notifBtn.title =
@@ -861,10 +1052,19 @@ function initNotificationUI() {
       // default
       notifBtn.textContent = "🔔 Activar avisos";
       notifBtn.title =
-        "Permiso de notificaciones no solicitado. Haz clic para activar avisos de sincronización.";
+        "Permiso de notificaciones no solicitado. Haz clic para activar avisos de sincronización y nuevos avistamientos.";
       if (notifBanner && notifBanner.dataset.variant === "denied") {
         hideNotificationBanner();
       }
+    }
+  });
+
+  // Escuchar cambios de estado de suscripción Web Push
+  onPushStateChange((pushState) => {
+    if (!notifBtn) return;
+    if (pushState.isSubscribed) {
+      notifBtn.textContent = "🔔 Avisos activos";
+      notifBtn.title = "Notificaciones Web Push activadas en este dispositivo.";
     }
   });
 
@@ -881,27 +1081,77 @@ function initNotificationUI() {
     }
 
     if (currentState.permission === "granted") {
-      showNotificationBanner(
-        "✅ Las notificaciones locales están permitidas. Recibirás un aviso cuando tus avistamientos se sincronicen con el servidor.",
-        "granted",
-        4000
-      );
+      const activeSub = await getPushSubscription();
+      if (activeSub) {
+        showNotificationBanner(
+          "✅ Notificaciones Web Push activas. Recibirás avisos instantáneos de nuevos avistamientos registrados en el servidor.",
+          "granted",
+          4500
+        );
+      } else if (isPushManagerSupported()) {
+        const subResult = await subscribeToPush();
+        if (subResult.ok) {
+          showNotificationBanner(
+            "✅ ¡Suscripción Web Push completada! Dispositivo registrado en el servidor.",
+            "granted",
+            4500
+          );
+        } else {
+          showNotificationBanner(
+            `⚠️ Error al suscribir a push: ${subResult.error || "No se pudo completar"}`,
+            "denied",
+            5000
+          );
+        }
+      } else {
+        showNotificationBanner(
+          "✅ Las notificaciones locales están permitidas. Recibirás un aviso cuando tus avistamientos se sincronicen con el servidor.",
+          "granted",
+          4000
+        );
+      }
       return;
     }
 
     if (currentState.permission === "default") {
-      const outcome = await requestNotificationPermission();
-      if (outcome.state === "granted") {
-        showNotificationBanner(
-          "✅ ¡Notificaciones activadas! Te avisaremos cuando tus avistamientos terminen de sincronizarse.",
-          "granted",
-          4500
-        );
-      } else if (outcome.state === "denied") {
-        showNotificationBanner(
-          "🔕 Has bloqueado las notificaciones. Para habilitarlas después, cámbialo desde la configuración de permisos del sitio en el navegador.",
-          "denied"
-        );
+      if (isPushManagerSupported()) {
+        const result = await subscribeToPush();
+        if (result.ok) {
+          showNotificationBanner(
+            "✅ ¡Notificaciones Web Push activadas! Recibirás avisos de nuevos avistamientos registrados en el servidor.",
+            "granted",
+            4500
+          );
+        } else if (result.reason === "permission_denied") {
+          showNotificationBanner(
+            "🔕 Has bloqueado las notificaciones. Para habilitarlas después, cámbialo desde la configuración de permisos del sitio en el navegador.",
+            "denied"
+          );
+        } else {
+          // Fallback a solicitud básica local
+          const outcome = await requestNotificationPermission();
+          if (outcome.state === "granted") {
+            showNotificationBanner(
+              "✅ ¡Notificaciones activadas! Te avisaremos cuando tus avistamientos terminen de sincronizarse.",
+              "granted",
+              4500
+            );
+          }
+        }
+      } else {
+        const outcome = await requestNotificationPermission();
+        if (outcome.state === "granted") {
+          showNotificationBanner(
+            "✅ ¡Notificaciones activadas! Te avisaremos cuando tus avistamientos terminen de sincronizarse.",
+            "granted",
+            4500
+          );
+        } else if (outcome.state === "denied") {
+          showNotificationBanner(
+            "🔕 Has bloqueado las notificaciones. Para habilitarlas después, cámbialo desde la configuración de permisos del sitio en el navegador.",
+            "denied"
+          );
+        }
       }
     }
   });

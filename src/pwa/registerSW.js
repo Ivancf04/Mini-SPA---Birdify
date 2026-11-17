@@ -3,16 +3,9 @@
  * Practica: Registro de Service Worker con scope correcto y diagnostico de estado.
  */
 
-// 1. Deteccion dinamica y unica de la ruta base del proyecto
-// Soporta tanto localhost (raiz '/') como GitHub Pages (ej. '/Mini-SPA---Birdify/')
-const isGithubPages = window.location.hostname.endsWith("github.io");
-const pathSegments = window.location.pathname.split("/").filter(Boolean);
-
-export const BASE_PATH =
-  isGithubPages && pathSegments.length > 0 ? `/${pathSegments[0]}/` : "/";
-
-export const SW_PATH = `${BASE_PATH}sw.js`;
-export const SW_SCOPE = BASE_PATH;
+// 1. Importación centralizada de la ruta base y scope desde src/config.js
+import { BASE_PATH, SW_PATH, SW_SCOPE } from "../config.js";
+export { BASE_PATH, SW_PATH, SW_SCOPE };
 
 let isRefreshingOnControllerChange = false;
 

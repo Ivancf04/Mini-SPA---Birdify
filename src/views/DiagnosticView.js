@@ -17,6 +17,7 @@ import {
   SYNC_TAG,
 } from "../services/syncService.js";
 import { getNotificationDiagnosticState } from "../pwa/notifications.js";
+import { getPushDiagnosticState } from "../pwa/pushNotifications.js";
 
 /**
  * Vista de diagnóstico:
@@ -57,6 +58,7 @@ export default async function DiagnosticView() {
   const currentModeLabel = getSyncModeLabel();
   const apiEndpoint = getApiEndpoint();
   const notifState = getNotificationDiagnosticState();
+  const pushDiag = await getPushDiagnosticState();
 
   // Definicion de las 5 rutas minimas requeridas para la verificacion de scope
   const testRoutes = [
@@ -474,6 +476,93 @@ export default async function DiagnosticView() {
           </div>
           <button id="clear-visits-btn" type="button" class="btn-clear">Limpiar</button>
         </div>
+      </div>
+
+      <!-- 8. Web Push Notifications, VAPID y Supabase (Unidad 4 — Ejercicio 6) -->
+      <div class="card diagnostic-panel">
+        <div class="diagnostic-panel-header">
+          <h2>Web Push Notifications & VAPID (Ejercicio 6)</h2>
+          <span class="badge-status ${pushDiag.isSubscribed ? "badge-state-activated" : "badge-state-installing"}">
+            ${pushDiag.isSubscribed ? "PUSH ACTIVO (SUSCRITO)" : "SIN SUSCRIPCIÓN"}
+          </span>
+        </div>
+        <p class="subtitle">Gestión en vivo de PushManager, intercambio de llaves VAPID y registro en Supabase.</p>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Soporte PushManager en navegador:</strong>
+            <p class="diagnostic-value ${pushDiag.supported ? "badge-success" : "badge-warning"}">
+              ${pushDiag.supported ? "Sí ('PushManager' in window && 'Notification' in window)" : "No soportado en este navegador"}
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Permiso de Notificaciones:</strong>
+            <p>
+              <code>Notification.permission = "${pushDiag.permission}"</code>
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Estado de Suscripción Web Push:</strong>
+            <p>
+              <span class="badge ${pushDiag.isSubscribed ? "badge-scope-in" : "badge-scope-out"}">
+                ${pushDiag.isSubscribed ? "Activa (PushSubscription presente en Service Worker)" : "Inactiva"}
+              </span>
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Endpoint de suscripción:</strong>
+            <p style="word-break: break-all; font-family: monospace; font-size: 0.8rem;">
+              ${pushDiag.endpoint ? pushDiag.endpoint : "(sin suscripción activa)"}
+            </p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Usuario activo en Supabase (public.users):</strong>
+            <p><code>${pushDiag.userId}</code> (ivanroko109)</p>
+          </div>
+        </div>
+
+        <div class="diagnostic-row">
+          <div>
+            <strong>Endpoints de la API de Notificaciones:</strong>
+            <p style="font-size: 0.8rem; line-height: 1.4;">
+              <code>GET ${pushDiag.endpoints.vapid}</code><br/>
+              <code>POST ${pushDiag.endpoints.subscribe}</code><br/>
+              <code>POST ${pushDiag.endpoints.unsubscribe}</code><br/>
+              <code>GET/POST ${pushDiag.endpoints.sightings}</code>
+            </p>
+          </div>
+        </div>
+
+        <!-- Acciones Push -->
+        <div class="diagnostic-row">
+          <div>
+            <strong>Acciones de prueba Web Push:</strong>
+            <p class="subtitle" style="margin: 0.25rem 0 0.5rem 0;">Prueba suscribirte, desuscribirte o sincronizar con Supabase.</p>
+          </div>
+          <div style="display: flex; gap: 0.5rem; flex-wrap: wrap;">
+            ${
+              pushDiag.isSubscribed
+                ? `<button id="btn-diag-unsubscribe-push" type="button" class="btn-warning">🔕 Cancelar Suscripción</button>`
+                : `<button id="btn-diag-subscribe-push" type="button" class="btn-action">🔔 Suscribirse a Push</button>`
+            }
+            <button id="btn-diag-resync-push" type="button" class="btn-clear">🔄 Resincronizar con Backend</button>
+            <button id="btn-diag-check-vapid" type="button" class="btn-clear">🔑 Probar VAPID Key</button>
+          </div>
+        </div>
+
+        <div id="push-diag-feedback" class="feedback-box" style="display: none; margin-top: 0.75rem;"></div>
       </div>
     </section>
   `;
