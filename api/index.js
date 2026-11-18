@@ -104,6 +104,24 @@ app.use(express.json({ limit: "1mb" }));
 // ---------------------------------------------------------------------------
 const router = express.Router();
 
+// GET / — Root service overview
+router.get("/", (req, res) => {
+  res.status(200).json({
+    ok: true,
+    service: "Birdify Backend API",
+    status: "healthy",
+    message: "Birdify Web Push & Sightings Backend running smoothly.",
+    endpoints: {
+      health: "/api/health",
+      vapidPublicKey: "/api/vapid-public-key",
+      sightings: "/api/sightings",
+      subscribe: "/api/subscribe",
+      unsubscribe: "/api/unsubscribe",
+    },
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // GET /api/health — System health check
 router.get("/health", (req, res) => {
   res.status(200).json({
