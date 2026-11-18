@@ -99,6 +99,18 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
+// Normalize URL in case Vercel rewrite or client includes /index.js in the path
+app.use((req, res, next) => {
+  if (req.url === "/api/index.js" || req.url === "/index.js") {
+    req.url = "/";
+  } else if (req.url.startsWith("/api/index.js/")) {
+    req.url = req.url.replace("/api/index.js", "/api");
+  } else if (req.url.startsWith("/index.js/")) {
+    req.url = req.url.replace("/index.js", "");
+  }
+  next();
+});
+
 // ---------------------------------------------------------------------------
 // 3. API Router Definition
 // ---------------------------------------------------------------------------
