@@ -99,23 +99,6 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
-// Normalize URL: recover real path from Vercel rewrite headers if present
-app.use((req, res, next) => {
-  const matchedPath = req.headers["x-matched-path"] || req.headers["x-vercel-matched-path"];
-  if (matchedPath && typeof matchedPath === "string" && !matchedPath.endsWith("/index.js")) {
-    req.url = matchedPath;
-  }
-
-  if (req.url === "/api/index.js" || req.url === "/index.js" || req.url === "/api" || req.url === "") {
-    req.url = "/";
-  } else if (req.url.startsWith("/api/index.js/")) {
-    req.url = req.url.replace("/api/index.js", "/api");
-  } else if (req.url.startsWith("/index.js/")) {
-    req.url = req.url.replace("/index.js", "");
-  }
-  next();
-});
-
 // ---------------------------------------------------------------------------
 // 3. API Router Definition
 // ---------------------------------------------------------------------------
