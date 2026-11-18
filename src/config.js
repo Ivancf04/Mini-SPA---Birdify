@@ -29,11 +29,14 @@ export const STORAGE_KEY_USER_ID = "birdify_user_id";
 // Default user UUID corresponding to ivanroko109 in Supabase public.users
 export const DEFAULT_USER_ID = "0f99790f-05a5-4049-8605-3180bbe889cb";
 
+// Production backend deployed on Vercel
+export const DEFAULT_PRODUCTION_BACKEND_URL = "https://mini-spa-birdify.vercel.app";
+
 /**
  * Resolves the dynamic backend API base URL:
  * 1. Custom URL saved in localStorage ('birdify_api_base_url')
  * 2. In local development (localhost or 127.0.0.1): defaults to 'http://localhost:3000'
- * 3. In production: defaults to window.location.origin
+ * 3. In production (GitHub Pages): defaults to DEFAULT_PRODUCTION_BACKEND_URL
  */
 export function getApiBaseUrl() {
   if (typeof localStorage !== "undefined") {
@@ -58,9 +61,11 @@ export function getApiBaseUrl() {
       return "http://localhost:3000";
     }
 
-    return window.location.origin;
+    // In production (e.g. GitHub Pages), connect directly to Vercel backend
+    return DEFAULT_PRODUCTION_BACKEND_URL;
   }
 
+  // Node.js or test runner environment fallback
   return "http://localhost:3000";
 }
 
