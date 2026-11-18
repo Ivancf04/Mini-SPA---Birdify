@@ -59,7 +59,7 @@ const recentClientRequests = new Map();
 // ---------------------------------------------------------------------------
 // 2. Middleware & CORS Configuration
 // ---------------------------------------------------------------------------
-const rawAllowedOrigins = process.env.ALLOWED_ORIGIN || "http://localhost:3000,http://127.0.0.1:5500,https://ivanroko109.github.io";
+const rawAllowedOrigins = process.env.ALLOWED_ORIGIN || "http://localhost:3000,http://127.0.0.1:5500,https://ivancf04.github.io,https://ivanroko109.github.io";
 const allowedOrigins = rawAllowedOrigins
   .split(",")
   .map((origin) => origin.trim().replace(/\/+$/, ""))
@@ -75,16 +75,20 @@ const corsOptions = {
       return callback(null, true);
     }
 
-    // In non-production, permit localhost and 127.0.0.1 on any port
-    if (process.env.NODE_ENV !== "production") {
-      try {
-        const parsed = new URL(origin);
+    try {
+      const parsed = new URL(origin);
+      // Permit GitHub Pages domains (*.github.io)
+      if (parsed.hostname.endsWith("github.io")) {
+        return callback(null, true);
+      }
+      // In non-production, permit localhost and 127.0.0.1 on any port
+      if (process.env.NODE_ENV !== "production") {
         if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
           return callback(null, true);
         }
-      } catch {
-        // Ignored, proceed to rejection
       }
+    } catch {
+      // Ignored, proceed to rejection
     }
 
     console.warn(`[CORS Blocked] Origin not allowed: ${origin}`);
@@ -97,6 +101,7 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 app.use(express.json({ limit: "1mb" }));
 
 // ---------------------------------------------------------------------------
