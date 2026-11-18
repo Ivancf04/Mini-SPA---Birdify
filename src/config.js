@@ -42,7 +42,7 @@ export function getApiBaseUrl() {
   if (typeof localStorage !== "undefined") {
     try {
       const custom = localStorage.getItem(STORAGE_KEY_API_BASE);
-      if (custom && custom.trim()) {
+      if (custom && custom.trim() && !custom.includes("github.io")) {
         return custom.trim().replace(/\/+$/, "");
       }
     } catch {
