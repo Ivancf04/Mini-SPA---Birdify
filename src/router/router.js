@@ -108,10 +108,7 @@ export default class Router {
         <div class="skeleton-block card"></div>
       </div>
     `;
-
-    // Pausa de 2 segundos para poder ver el skeleton loader
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
+    
     if (!match) {
       const { default: NotFoundView } = await import(
         "../views/NotFoundView.js"

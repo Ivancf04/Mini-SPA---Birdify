@@ -6,10 +6,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Birdify — Catálogo de Aves</title>
   <meta name="description" content="Birdify: catálogo de aves y bitácora de avistamientos que funciona sin conexión." />
-  <!-- Favicon vacío: evita una petición extra a /favicon.ico (404 en línea, 503 sin red) -->
   <link rel="icon" href="data:," />
+  <link rel="preconnect" href="https://api.inaturalist.org" crossorigin />
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://inaturalist-open-data.s3.amazonaws.com" />
+  <link rel="preconnect" href="https://static.inaturalist.org" />
 
-  <!-- Script para recibir redirección de 404.html en GitHub Pages -->
+  <link rel="modulepreload" href="src/router/router.js" />
+  <link rel="modulepreload" href="src/views/HomeView.js" />
+  <link rel="modulepreload" href="src/views/AboutView.js" />
+  <link rel="modulepreload" href="src/views/SightingsView.js" />
+  <link rel="modulepreload" href="src/views/ItemDetailView.js" />
+  <link rel="modulepreload" href="src/views/DiagnosticView.js" />
+  <link rel="modulepreload" href="src/utils/storage.js" />
+  <link rel="modulepreload" href="src/services/dbService.js" />
+  <link rel="modulepreload" href="src/pwa/registerSW.js" />
+  <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/idb@8.0.4/+esm" crossorigin />
+
   <script type="text/javascript">
     (function (l) {
       if (l.search[1] === '/') {
@@ -23,18 +36,20 @@
     }(window.location))
   </script>
 
-  <!--
-    Separación App Shell / Contenido:
-    hell.css que estilos estructurales permanentes como header, nav, footer y #app
-    home.css que son estilos específicos de la vista Inicio osea el grid de tarjetas
-    detail.css son estilos específicos de la vista de detalle
-  -->
+
   <link rel="stylesheet" href="styles/shell.css" />
   <link rel="stylesheet" href="styles/home.css" />
-  <link rel="stylesheet" href="styles/sightings.css" />
-  <link rel="stylesheet" href="styles/detail.css" />
   <link rel="stylesheet" href="styles/theme.css" />
-  <link rel="stylesheet" href="styles/diagnostic.css" />
+
+  <link rel="preload" href="styles/sightings.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <link rel="preload" href="styles/detail.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <link rel="preload" href="styles/diagnostic.css" as="style" onload="this.onload=null;this.rel='stylesheet'" />
+  <noscript>
+    <link rel="stylesheet" href="styles/sightings.css" />
+    <link rel="stylesheet" href="styles/detail.css" />
+    <link rel="stylesheet" href="styles/diagnostic.css" />
+  </noscript>
+
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#018547">
   <link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
@@ -51,11 +66,10 @@
 
 <body>
 
-  <!-- app shell que se mantiene en toda la vida de la SPA nunca se reemplaza -->
   <header>
     <div class="brand-group">
       <h1>Birdify</h1>
-      <!-- Indicador cuando corre como app instalada (Requisito 5) -->
+   
       <span id="installed-badge" class="badge-installed" hidden title="Ejecutándose en modo aplicación">⚡ Instalada</span>
     </div>
     <nav>
@@ -64,17 +78,16 @@
       <a href="/avistamientos" data-link>Avistamientos</a>
       <a href="/diagnostico" data-link>Diagnóstico</a>
       
-      <!-- Botón "Instalar app" en la interfaz fija Shell (Requisito 4) -->
+   
       <button id="install-btn" class="btn-install" type="button" aria-label="Instalar app" hidden>
         📲 Instalar app
       </button>
 
-      <!-- Botón de Plan B para iOS y navegadores sin evento nativo (Requisito 5) -->
+
       <button id="install-guide-btn" class="btn-install btn-install--guide" type="button" aria-label="Guía de instalación" hidden>
         💡 Cómo instalar
       </button>
 
-      <!-- Control de permisos de notificaciones locales en el Shell -->
       <button
         id="notification-permission-btn"
         class="btn-notification"
@@ -86,22 +99,17 @@
       </button>
 
       <button id="theme-toggle" type="button" aria-label="Cambiar tema claro/oscuro">🌙</button>
-      <!-- Insignia de conectividad (la controla src/pwa/networkStatus.js) -->
+
       <span id="network-badge" class="network-badge" role="status" aria-live="polite" hidden></span>
     </nav>
   </header>
 
-  <!-- Franja explicativa cuando no hay red o se sirve una copia guardada -->
+
   <div id="network-banner" class="network-banner" role="status" aria-live="polite" hidden></div>
 
-  <!-- Franja de estado de permisos de notificaciones en el Shell (explicación en estado denied / confirmación) -->
+ 
   <div id="notification-banner" class="notification-banner" role="status" aria-live="polite" hidden></div>
 
-  <!--
-    contendor raiz única zona que el router modifica.
-    El skeleton es visible mientras el router resuelve la vista
-    el router lo reemplaza con el HTML real de la vista
-  -->
   <main id="app">
     <div class="skeleton-loader" aria-label="Cargando contenido…" role="status">
       <div class="skeleton-block title"></div>
@@ -111,7 +119,6 @@
     </div>
   </main>
 
-  <!-- Modal accesible de Instrucciones de Instalación (Plan B para iOS y navegadores sin beforeinstallprompt) -->
   <div id="install-modal" class="install-modal-backdrop" hidden role="dialog" aria-modal="true" aria-labelledby="install-modal-title">
     <div class="install-modal-card">
       <div class="install-modal-header">
@@ -119,7 +126,7 @@
         <button type="button" id="close-install-modal-btn" class="install-modal-close" aria-label="Cerrar modal">&times;</button>
       </div>
       <div id="install-modal-content" class="install-modal-body">
-        <!-- Contenido inyectado dinámicamente -->
+      
       </div>
       <div class="install-modal-footer">
         <button type="button" id="dismiss-install-modal-btn" class="btn-action">Entendido</button>
@@ -127,7 +134,6 @@
     </div>
   </div>
 
-  <!--footer se mantiene en toda la vida de la SPA nunca se reemplaza -->
   <footer>
     <p>Todos los derechos reservados — Birdify</p>
   </footer>

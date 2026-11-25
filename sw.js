@@ -1,7 +1,4 @@
 // sw.js — service worker de birdify
-// unidad 3 · ejercicio 4: estrategias de caché por tipo de recurso (offline first)
-// unidad 4 · ejercicio 1: manifest e íconos en el precache (CACHE_VERSION v3)
-// unidad 4 · ejercicio 2: captura de instalación PWA y Plan B (CACHE_VERSION v4)
 
 console.log("[sw.js] service worker corriendo");
 console.log("[sw.js] contexto global (self.constructor.name):", self.constructor.name);
@@ -11,25 +8,21 @@ console.log("[sw.js] typeof localStorage:", typeof localStorage);
 console.log("[sw.js] scope (self.registration.scope):", self.registration.scope);
 
 const CACHE_PREFIX = "birdify-shell";
-const CACHE_VERSION = "v12";
+const CACHE_VERSION = "v13";
 const CACHE_NAME = `${CACHE_PREFIX}-${CACHE_VERSION}`;
 
-// origenes externos que ocupa la app
+
 const CDN_ORIGIN = "https://cdn.jsdelivr.net";
 const INATURALIST_API_ORIGIN = "https://api.inaturalist.org";
 
-// libreria idb en cdn: dbService la importa directo, asi que sin ella
-// la app ni arranca. dejamos version fija (8.0.4) para que no cambie y jale cache first.
+
 const IDB_MODULE_URL = `${CDN_ORIGIN}/npm/idb@8.0.4/+esm`;
 
-// primera llamada que hace inicio para el catalogo (coincide con apiService.getBirds(9))
+
 const INATURALIST_HOME_URL =
   `${INATURALIST_API_ORIGIN}/v1/taxa?taxon_id=3&rank=species&per_page=9&locale=es`;
 
-// ─────────────────────────────────────────────────────────────────────
-// 2. precaching
-// ─────────────────────────────────────────────────────────────────────
-// todo lo necesario para arrancar y navegar sin red.
+
 const APP_SHELL = [
   // App Shell
   "./",
@@ -95,7 +88,6 @@ self.addEventListener("install", (event) => {
     (async () => {
       const cache = await caches.open(CACHE_NAME);
 
-      // cache: "reload" para no jalar cosas viejas de la caché http
       const required = [...PRECACHE_LOCAL, ...PRECACHE_EXTERNAL].map(
         (url) => new Request(url, { cache: "reload" })
       );
@@ -120,9 +112,6 @@ self.addEventListener("install", (event) => {
   );
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// 3. activate: borrar caches viejas
-// ─────────────────────────────────────────────────────────────────────
 self.addEventListener("activate", (event) => {
   console.log(`[SW] activando ${CACHE_NAME}`);
   event.waitUntil(
@@ -142,9 +131,6 @@ self.addEventListener("activate", (event) => {
   );
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// 4. funciones de ayuda
-// ─────────────────────────────────────────────────────────────────────
 function shortUrl(url) {
   const u = new URL(url);
   return u.origin === self.location.origin ? u.pathname + u.search : u.host + u.pathname;
@@ -195,9 +181,6 @@ async function notifyClients(message) {
   clients.forEach((client) => client.postMessage(message));
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// 5. respuesta de emergencia (sin red y sin copia en caché)
-// ─────────────────────────────────────────────────────────────────────
 function offlineFallback(request, label) {
   const url = new URL(request.url);
   const headers = { "X-Birdify-Offline": "1", "Cache-Control": "no-store" };
@@ -250,10 +233,6 @@ function offlineFallback(request, label) {
     headers: { ...headers, "Content-Type": "text/plain; charset=utf-8" },
   });
 }
-
-// ─────────────────────────────────────────────────────────────────────
-// 6. ESTRATEGIAS (una función por estrategia)
-// ─────────────────────────────────────────────────────────────────────
 
 async function cacheFirst(event, request, label, options = {}) {
   const cache = await caches.open(CACHE_NAME);
@@ -337,10 +316,6 @@ async function staleWhileRevalidate(event, request, label, options = {}) {
   return offlineFallback(request, label);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// 7. TABLA DE DECISIÓN LLEVADA A CÓDIGO
-// ─────────────────────────────────────────────────────────────────────
-
 const SAME_ORIGIN = self.location.origin;
 const SCOPE_PATH = new URL(self.registration.scope).pathname; // "/" o "/Mini-SPA---Birdify/"
 
@@ -398,33 +373,26 @@ function chooseStrategy(request) {
   // Excluir explícitamente todas las llamadas a la API del backend para no cachear datos dinámicos
   if (url.pathname.includes("/api/")) return null;
 
-  // - Esquemas que no son http(s) (chrome-extension:, data:, blob:).
+
   if (!url.protocol.startsWith("http")) return null;
-  // - Peticiones parciales (Range), p. ej. audio/video: la caché no las soporta bien.
+ 
   if (request.headers.has("range")) return null;
 
   const route = ROUTES.find((r) => r.test({ request, url }));
-  // - Otros orígenes no listados en la tabla (no los conocemos ni controlamos).
+
   return route || null;
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// 8. FETCH
-// ─────────────────────────────────────────────────────────────────────
 self.addEventListener("fetch", (event) => {
   const route = chooseStrategy(event.request);
   if (!route) return; // el navegador la resuelve sin pasar por la caché
   event.respondWith(route.handler(event, event.request, route.label));
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// 9. BACKGROUND SYNC (TAG: birdify-sync-sightings)
-// ─────────────────────────────────────────────────────────────────────
-
 const SYNC_TAG_NAME = "birdify-sync-sightings";
 let configuredBackendEndpoint = "http://localhost:3000/api/sightings";
 
-// Permitir actualizar la URL del backend desde mensajes de la app
+
 self.addEventListener("message", (event) => {
   if (event.data?.type === "BIRDIFY_SET_BACKEND_ENDPOINT" && event.data.endpoint) {
     configuredBackendEndpoint = event.data.endpoint;
@@ -432,10 +400,6 @@ self.addEventListener("message", (event) => {
   }
 });
 
-/**
- * Acceso directo a IndexedDB (BirdifyDB) en contexto de Service Worker clásico.
- * Totalmente compatible sin dependencias externas, sin imports estáticos y sin window/document/localStorage.
- */
 function swOpenDB() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open("BirdifyDB", 2);
@@ -535,10 +499,6 @@ function swUpdateOutboxAttempt(clientRequestId, errorMessage) {
   });
 }
 
-/**
- * Muestra una notificación local desde el Service Worker cuando se confirma la sincronización
- * de avistamientos por Background Sync.
- */
 async function swShowSyncNotification(syncedItems = []) {
   try {
     if (typeof Notification !== "undefined" && Notification.permission !== "granted") {
@@ -593,15 +553,11 @@ async function swShowSyncNotification(syncedItems = []) {
     });
     return true;
   } catch (err) {
-    // Requisito 3: Un fallo al mostrar la notificación nunca debe hacer fallar la sincronización
     console.warn("[SW] No se pudo mostrar la notificación local tras Background Sync:", err);
     return false;
   }
 }
 
-/**
- * Procesa la cola outbox durante el evento Background Sync
- */
 async function processOutboxQueueInSW() {
   console.log("[SW] Iniciando procesamiento de outbox desde Background Sync...");
   const items = await swGetAllOutbox();
@@ -687,9 +643,6 @@ async function processOutboxQueueInSW() {
     notificationShownBySW,
   });
 
-  // Requisito 4: PROPAGAR RECHAZO HASTA waitUntil
-  // Los reintentos del navegador ante rechazo en waitUntil no son inmediatos ni ilimitados.
-  // Errores permanentes (ej. datos inválidos) requieren corrección del usuario.
   if (failedCount > 0) {
     console.warn(
       `[SW] Sync finalizado con ${failedCount} fallos. Propagando rechazo a waitUntil para programar reintento del navegador.`
@@ -703,9 +656,6 @@ async function processOutboxQueueInSW() {
   console.log(`[SW] Background Sync completado exitosamente (${items.length} operaciones sincronizadas).`);
 }
 
-// ─────────────────────────────────────────────────────────────────────
-// EVENTO SYNC
-// ─────────────────────────────────────────────────────────────────────
 self.addEventListener("sync", (event) => {
   if (event.tag === SYNC_TAG_NAME) {
     // Requisito 4: Imprime "[SW] sync" junto con la tag
@@ -715,9 +665,6 @@ self.addEventListener("sync", (event) => {
   }
 });
 
-// ─────────────────────────────────────────────────────────────────────
-// 10. NOTIFICATIONCLICK (Navegación segura y enfoque de ventana)
-// ─────────────────────────────────────────────────────────────────────
 const VALID_APP_ROUTES = new Set([
   "/",
   "/index.html",
@@ -732,11 +679,6 @@ function isValidInternalRoutePath(routePath) {
   return false;
 }
 
-/**
- * Valida que el destino de la notificación corresponda a la aplicación y respeta
- * el esquema real de rutas (History API + ruta base de GitHub Pages o hash si se recibiera).
- * Si el dato está ausente o es inválido/externo, devuelve una ruta de respaldo segura.
- */
 function resolveNotificationTargetUrl(rawUrl) {
   const scopeUrl = new URL(SCOPE_PATH, self.location.origin);
   const safeFallbackUrl = new URL(`${SCOPE_PATH}avistamientos`, self.location.origin).href;
@@ -748,12 +690,11 @@ function resolveNotificationTargetUrl(rawUrl) {
   try {
     const candidate = new URL(rawUrl.trim(), scopeUrl);
 
-    // Rechazar orígenes distintos al de la aplicación
+  
     if (candidate.origin !== self.location.origin) {
       return safeFallbackUrl;
     }
 
-    // Si se recibiera una ruta con hash (ej. #/avistamientos), normalizarla al router real
     if (candidate.hash && candidate.hash.startsWith("#/")) {
       const hashPath = candidate.hash.slice(1).split("?")[0];
       if (isValidInternalRoutePath(hashPath)) {
@@ -768,7 +709,6 @@ function resolveNotificationTargetUrl(rawUrl) {
     if (SCOPE_PATH !== "/" && pathname.startsWith(SCOPE_PATH)) {
       relativeRoute = "/" + pathname.slice(SCOPE_PATH.length);
     } else if (SCOPE_PATH !== "/" && !pathname.startsWith(SCOPE_PATH)) {
-      // Si se pasó una ruta interna sin el prefijo de GitHub Pages (ej. "/avistamientos")
       if (isValidInternalRoutePath(pathname)) {
         return new URL(`${SCOPE_PATH}${pathname.replace(/^\//, "")}`, self.location.origin).href;
       }
@@ -830,32 +770,24 @@ self.addEventListener("notificationclick", (event) => {
     })()
   );
 });
-
-// ─────────────────────────────────────────────────────────────────────
-// 11. WEB PUSH NOTIFICATIONS (Servidor -> Service Worker)
-// ─────────────────────────────────────────────────────────────────────
 function normalizeScopedUrl(rawUrl, scopePath = SCOPE_PATH) {
   if (!rawUrl || typeof rawUrl !== "string") return rawUrl;
   const trimmed = rawUrl.trim();
   if (!trimmed) return trimmed;
 
-  // Dejar intactas URLs absolutas HTTP(S)
+
   if (/^https?:\/\//i.test(trimmed)) {
     return trimmed;
   }
 
-  // Si ya inicia con SCOPE_PATH (ej. "/Mini-SPA---Birdify/..." o "/..." en raíz), no re-prefijar
   if (trimmed.startsWith(scopePath)) {
     return trimmed;
   }
-
-  // Manejar ruta con subdirectorio sin barra inicial (ej. "Mini-SPA---Birdify/icons/...")
   const scopeWithoutLeadingSlash = scopePath.replace(/^\/+/, "");
   if (scopeWithoutLeadingSlash && trimmed.startsWith(scopeWithoutLeadingSlash)) {
     return `/${trimmed}`;
   }
 
-  // Normalizar rutas relativas ("icons/...", "./icons/...") o absolutas de raíz ("/icons/...")
   const cleanRelative = trimmed.replace(/^(?:\.\/)+/, "").replace(/^\/+/, "");
   return `${scopePath}${cleanRelative}`;
 }
@@ -894,7 +826,6 @@ self.addEventListener("push", (event) => {
     }
   }
 
-  // Resolver rutas relativas de iconos y URLs al scope del Service Worker (evita fallos en GitHub Pages)
   if (payload.icon) {
     payload.icon = normalizeScopedUrl(payload.icon, SCOPE_PATH);
   }
